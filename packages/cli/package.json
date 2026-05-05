@@ -1,0 +1,45 @@
+{
+  "name": "api-sdk-generator",
+  "version": "0.1.0",
+  "description": "CLI for generating TypeScript SDK clients from OpenAPI 3.x schemas.",
+  "type": "module",
+  "bin": {
+    "api-sdk-generator": "./dist/cli.cjs"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true,
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "tsup",
+    "generate": "node ./dist/cli.cjs generate",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest",
+    "lint": "eslint src test",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "clean": "rm -rf dist coverage"
+  },
+  "dependencies": {
+    "@api-sdk-generator/core": "workspace:*",
+    "commander": "^13.1.0",
+    "picocolors": "^1.1.1"
+  }
+}

@@ -1,0 +1,35 @@
+name: Bug report
+description: Report a defect in the generator, CLI, or release workflow.
+title: '[Bug]: '
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting an issue. Please provide enough context to reproduce it.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command
+      description: Exact CLI command or API call
+      placeholder: npx api-sdk-generator generate --file ./openapi.json --output ./generated
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true

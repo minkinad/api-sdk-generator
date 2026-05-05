@@ -1,0 +1,14 @@
+{
+  "name": "@api-sdk-generator/demo",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "dependencies": {
+    "api-sdk-generator": "workspace:*"
+  },
+  "scripts": {
+    "build": "INIT_CWD=$PWD node ../../packages/cli/dist/cli.cjs generate --file ./openapi.json --output ./generated --name demo-sdk --clean && tsc --project tsconfig.json --noEmit",
+    "clean": "rm -rf generated",
+    "typecheck": "tsc --project tsconfig.json --noEmit"
+  }
+}

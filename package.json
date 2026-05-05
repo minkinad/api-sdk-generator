@@ -1,0 +1,45 @@
+{
+  "name": "api-sdk-generator-workspace",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm --filter @api-sdk-generator/core build && pnpm --filter api-sdk-generator build && pnpm --filter @api-sdk-generator/demo build && pnpm --filter @api-sdk-generator/docs build",
+    "dev": "pnpm --filter @api-sdk-generator/docs dev",
+    "test": "pnpm --filter @api-sdk-generator/core test && pnpm --filter api-sdk-generator test",
+    "test:watch": "pnpm --parallel --filter @api-sdk-generator/core --filter api-sdk-generator test:watch",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "pnpm --filter @api-sdk-generator/core typecheck && pnpm --filter api-sdk-generator typecheck && pnpm --filter @api-sdk-generator/demo typecheck && pnpm --filter @api-sdk-generator/docs typecheck",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "clean": "pnpm -r clean && rm -rf node_modules",
+    "changeset": "changeset",
+    "version": "changeset version && pnpm install --no-frozen-lockfile",
+    "release": "pnpm build && changeset publish",
+    "docs:dev": "pnpm --filter @api-sdk-generator/docs dev",
+    "docs:build": "pnpm --filter @api-sdk-generator/docs build",
+    "docs:preview": "pnpm --filter @api-sdk-generator/docs preview"
+  },
+  "devDependencies": {
+    "@changesets/changelog-github": "^0.5.1",
+    "@changesets/cli": "^2.29.5",
+    "@eslint/js": "^9.27.0",
+    "@types/node": "^22.15.17",
+    "@typescript-eslint/eslint-plugin": "^8.32.1",
+    "@typescript-eslint/parser": "^8.32.1",
+    "@vitest/coverage-v8": "^3.1.4",
+    "eslint": "^9.27.0",
+    "eslint-config-prettier": "^10.1.5",
+    "eslint-plugin-import": "^2.31.0",
+    "globals": "^16.1.0",
+    "prettier": "^3.5.3",
+    "tsup": "^8.4.0",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.32.1",
+    "vitest": "^3.1.4"
+  }
+}
