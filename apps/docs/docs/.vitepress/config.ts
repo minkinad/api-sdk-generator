@@ -9,7 +9,7 @@ export default defineConfig({
   description: 'Generate production-ready TypeScript SDK clients from OpenAPI 3.x schemas.',
   lang: 'en-US',
   lastUpdated: true,
-  outDir: 'docs/.vitepress/dist',
+  outDir: '.vitepress/dist',
   themeConfig: {
     footer: {
       copyright: 'MIT Licensed',
