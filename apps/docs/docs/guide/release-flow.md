@@ -19,9 +19,15 @@
 - `NPM_TOKEN`
 - `GITHUB_TOKEN` is provided by GitHub Actions automatically
 
+## Required repository settings
+
+- Under `Settings -> Actions -> General -> Workflow permissions`, enable `Allow GitHub Actions to create and approve pull requests`.
+- If the repository belongs to an organization, make sure the organization-level Actions policy does not block that setting.
+
 ## First release
 
 1. Add `NPM_TOKEN` in repository settings.
-2. Enable GitHub Pages with GitHub Actions as the source.
-3. Merge a changeset to `main`.
-4. Merge the release PR produced by Changesets.
+2. Enable `Allow GitHub Actions to create and approve pull requests` in the repository Actions settings.
+3. Enable GitHub Pages with GitHub Actions as the source.
+4. Merge a changeset to `main`.
+5. Merge the release PR produced by Changesets.

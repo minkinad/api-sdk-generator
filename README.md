@@ -108,6 +108,7 @@ This repository uses Changesets.
 ### npm
 
 - Add `NPM_TOKEN` under `Settings -> Secrets and variables -> Actions`.
+- Under `Settings -> Actions -> General -> Workflow permissions`, enable `Allow GitHub Actions to create and approve pull requests`.
 - The `release.yml` workflow publishes `api-sdk-generator` and `@api-sdk-generator/core`.
 - npm provenance is enabled through `publishConfig.provenance` and workflow `id-token: write`.
 
@@ -130,9 +131,10 @@ This repository uses Changesets.
 ## First release
 
 1. Add `NPM_TOKEN`.
-2. Enable GitHub Pages with GitHub Actions.
-3. Merge the initial changeset on `main`.
-4. Merge the release PR created by Changesets.
+2. Enable `Allow GitHub Actions to create and approve pull requests` under `Settings -> Actions -> General -> Workflow permissions`.
+3. Enable GitHub Pages with GitHub Actions.
+4. Merge the initial changeset on `main`.
+5. Merge the release PR created by Changesets.
 
 ## Contributing
 
