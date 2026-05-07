@@ -1,6 +1,6 @@
 {
   "name": "@api-sdk-generator/core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Core OpenAPI to TypeScript SDK generation engine for api-sdk-generator.",
   "type": "module",
   "main": "./dist/index.cjs",
