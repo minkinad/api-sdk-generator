@@ -7,22 +7,22 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "pnpm --filter @api-sdk-generator/core build && pnpm --filter api-sdk-generator build && pnpm --filter @api-sdk-generator/demo build && pnpm --filter @api-sdk-generator/docs build",
-    "dev": "pnpm --filter @api-sdk-generator/docs dev",
-    "test": "pnpm --filter @api-sdk-generator/core test && pnpm --filter api-sdk-generator test",
-    "test:watch": "pnpm --parallel --filter @api-sdk-generator/core --filter api-sdk-generator test:watch",
+    "build": "pnpm --filter @minkinpackages/api-sdk-generator-core build && pnpm --filter api-sdk-generator build && pnpm --filter @minkinpackages/demo build && pnpm --filter @minkinpackages/docs build",
+    "dev": "pnpm --filter @minkinpackages/docs dev",
+    "test": "pnpm --filter @minkinpackages/api-sdk-generator-core test && pnpm --filter api-sdk-generator test",
+    "test:watch": "pnpm --parallel --filter @minkinpackages/api-sdk-generator-core --filter api-sdk-generator test:watch",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "typecheck": "pnpm --filter @api-sdk-generator/core typecheck && pnpm --filter api-sdk-generator typecheck && pnpm --filter @api-sdk-generator/demo typecheck && pnpm --filter @api-sdk-generator/docs typecheck",
+    "typecheck": "pnpm --filter @minkinpackages/api-sdk-generator-core typecheck && pnpm --filter api-sdk-generator typecheck && pnpm --filter @minkinpackages/demo typecheck && pnpm --filter @minkinpackages/docs typecheck",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "clean": "pnpm -r clean && rm -rf node_modules",
     "changeset": "changeset",
     "version": "changeset version && pnpm install --no-frozen-lockfile",
     "release": "pnpm build && changeset publish",
-    "docs:dev": "pnpm --filter @api-sdk-generator/docs dev",
-    "docs:build": "pnpm --filter @api-sdk-generator/docs build",
-    "docs:preview": "pnpm --filter @api-sdk-generator/docs preview"
+    "docs:dev": "pnpm --filter @minkinpackages/docs dev",
+    "docs:build": "pnpm --filter @minkinpackages/docs build",
+    "docs:preview": "pnpm --filter @minkinpackages/docs preview"
   },
   "devDependencies": {
     "@changesets/changelog-github": "^0.5.1",

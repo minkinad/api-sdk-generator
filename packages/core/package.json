@@ -1,5 +1,5 @@
 {
-  "name": "@api-sdk-generator/core",
+  "name": "@minkinpackages/api-sdk-generator-core",
   "version": "0.1.0",
   "description": "Core OpenAPI to TypeScript SDK generation engine for api-sdk-generator.",
   "type": "module",

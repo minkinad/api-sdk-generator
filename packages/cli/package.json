@@ -38,7 +38,7 @@
     "clean": "rm -rf dist coverage"
   },
   "dependencies": {
-    "@api-sdk-generator/core": "workspace:*",
+    "@minkinpackages/api-sdk-generator-core": "workspace:*",
     "commander": "^13.1.0",
     "picocolors": "^1.1.1"
   }

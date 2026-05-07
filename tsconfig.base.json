@@ -16,7 +16,7 @@
     "resolveJsonModule": true,
     "baseUrl": ".",
     "paths": {
-      "@api-sdk-generator/core": ["packages/core/src/index.ts"]
+      "@minkinpackages/api-sdk-generator-core": ["packages/core/src/index.ts"]
     },
     "declaration": true,
     "sourceMap": true

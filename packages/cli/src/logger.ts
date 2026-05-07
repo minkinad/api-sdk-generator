@@ -1,4 +1,4 @@
-import type { Logger } from '@api-sdk-generator/core';
+import type { Logger } from '@minkinpackages/api-sdk-generator-core';
 import pc from 'picocolors';
 
 export function createCliLogger(verbose = false): Logger {

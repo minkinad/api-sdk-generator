@@ -1,5 +1,5 @@
 ---
-'@api-sdk-generator/core': patch
+'@minkinpackages/api-sdk-generator-core': patch
 'api-sdk-generator': patch
 ---
 

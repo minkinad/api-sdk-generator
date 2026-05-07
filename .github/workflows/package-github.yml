@@ -33,9 +33,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build packages
-        run: pnpm --filter @api-sdk-generator/core build
+        run: pnpm --filter @minkinpackages/api-sdk-generator-core build
 
       - name: Publish scoped core package
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm --filter @api-sdk-generator/core publish --no-git-checks --registry https://npm.pkg.github.com
+        run: pnpm --filter @minkinpackages/api-sdk-generator-core publish --no-git-checks --registry https://npm.pkg.github.com

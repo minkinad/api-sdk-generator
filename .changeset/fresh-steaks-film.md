@@ -1,5 +1,5 @@
 ---
-'@api-sdk-generator/core': minor
+'@minkinpackages/api-sdk-generator-core': minor
 'api-sdk-generator': minor
 ---
 

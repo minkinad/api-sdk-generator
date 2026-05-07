@@ -3,8 +3,9 @@
 ## Secret setup
 
 1. Create an npm automation token with publish access.
-2. In GitHub, open `Settings -> Secrets and variables -> Actions`.
-3. Add a repository secret named `NPM_TOKEN`.
+2. If you publish a scoped package, create the matching npm organization or use a scope that belongs to your npm user account.
+3. In GitHub, open `Settings -> Secrets and variables -> Actions`.
+4. Add a repository secret named `NPM_TOKEN`.
 
 ## Provenance
 
@@ -16,5 +17,5 @@ After publishing, verify:
 
 ```bash
 npm view api-sdk-generator version
-npm view @api-sdk-generator/core version
+npm view @minkinpackages/api-sdk-generator-core version
 ```

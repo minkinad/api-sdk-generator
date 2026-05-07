@@ -109,13 +109,13 @@ This repository uses Changesets.
 
 - Add `NPM_TOKEN` under `Settings -> Secrets and variables -> Actions`.
 - Under `Settings -> Actions -> General -> Workflow permissions`, enable `Allow GitHub Actions to create and approve pull requests`.
-- The `release.yml` workflow publishes `api-sdk-generator` and `@api-sdk-generator/core`.
+- The `release.yml` workflow publishes `api-sdk-generator` and `@minkinpackages/api-sdk-generator-core`.
 - npm provenance is enabled through `publishConfig.provenance` and workflow `id-token: write`.
 
 ### GitHub Packages
 
 - GitHub Packages for npm requires scoped package names.
-- `package-github.yml` publishes `@api-sdk-generator/core` to `npm.pkg.github.com`.
+- `package-github.yml` publishes `@minkinpackages/api-sdk-generator-core` to `npm.pkg.github.com`.
 - If you need the CLI there as well, publish a scoped distribution such as `@minkinad/api-sdk-generator`.
 
 ## Documentation

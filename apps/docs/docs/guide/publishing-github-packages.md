@@ -3,7 +3,7 @@
 GitHub Packages for npm requires scoped package names. This repository uses:
 
 - `api-sdk-generator` for npm
-- `@api-sdk-generator/core` for npm and GitHub Packages
+- `@minkinpackages/api-sdk-generator-core` for npm and GitHub Packages
 
 The `package-github.yml` workflow publishes the scoped core package directly to `npm.pkg.github.com`.
 
