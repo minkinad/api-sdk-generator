@@ -17,4 +17,15 @@ describe('client generator', () => {
     expect(source).toContain('searchParams.set("page", String(request.page));');
     expect(source).toContain("headers.set('content-type', 'application/json');");
   });
+
+  it('treats vendor JSON response content types as JSON', () => {
+    const parsed = parseDocument(validateOpenApiDocument(fixture));
+    const source = generateClientSource(parsed);
+
+    expect(source).toContain('const body = isJsonContentType(contentType) ? await response.json() : await response.text();');
+    expect(source).toContain('if (isJsonContentType(contentType)) {');
+    expect(source).toContain(
+      'return contentType.includes("application/json") || contentType.includes("+json");',
+    );
+  });
 });

@@ -71,6 +71,24 @@ function extractParameters(
     }));
 }
 
+function mergeParameters(
+  document: OpenApiDocument,
+  pathParameters: Array<OpenAPIV3.ReferenceObject | OpenAPIV3.ParameterObject> | undefined,
+  operationParameters: Array<OpenAPIV3.ReferenceObject | OpenAPIV3.ParameterObject> | undefined,
+): ParsedParameter[] {
+  const merged = new Map<string, ParsedParameter>();
+
+  for (const parameter of extractParameters(document, pathParameters)) {
+    merged.set(`${parameter.in}:${parameter.name}`, parameter);
+  }
+
+  for (const parameter of extractParameters(document, operationParameters)) {
+    merged.set(`${parameter.in}:${parameter.name}`, parameter);
+  }
+
+  return [...merged.values()];
+}
+
 function getJsonContent<TContent>(container: { content?: Record<string, TContent> }): {
   contentType: string;
   value: TContent;
@@ -230,18 +248,9 @@ export function parseDocument(
       const functionName = createFunctionName(method, pathKey, operation.operationId);
       const requestTypeName = `${toTypeName(functionName)}Request`;
       const responseTypeName = `${toTypeName(functionName)}Response`;
-      const pathParameters = extractParameters(document, [
-        ...(pathItem.parameters ?? []),
-        ...(operation.parameters ?? []),
-      ]).filter((parameter, index, all) => {
-        return (
-          all.findIndex(
-            (candidate) => candidate.in === parameter.in && candidate.name === parameter.name,
-          ) === index
-        );
-      });
-      const queryParameters = pathParameters.filter((parameter) => parameter.in === 'query');
-      const extractedPathParameters = pathParameters.filter((parameter) => parameter.in === 'path');
+      const mergedParameters = mergeParameters(document, pathItem.parameters, operation.parameters);
+      const queryParameters = mergedParameters.filter((parameter) => parameter.in === 'query');
+      const extractedPathParameters = mergedParameters.filter((parameter) => parameter.in === 'path');
       const requestBody = extractRequestBody(document, operation.requestBody);
       const response = parseResponse(document, operation);
       const hasRequestShape =
@@ -250,7 +259,7 @@ export function parseDocument(
       operations.push({
         description: operation.description,
         functionName,
-        hasRequiredRequestFields: hasRequiredRequestFields(pathParameters, requestBody),
+        hasRequiredRequestFields: hasRequiredRequestFields(mergedParameters, requestBody),
         hasRequestShape,
         method,
         operationId: operation.operationId,
