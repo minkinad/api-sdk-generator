@@ -7,13 +7,13 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "pnpm --filter @minkinpackages/api-sdk-generator-core build && pnpm --filter api-sdk-generator build && pnpm --filter @minkinpackages/demo build && pnpm --filter @minkinpackages/docs build",
+    "build": "pnpm --filter @minkinad/api-sdk-generator-core build && pnpm --filter api-sdk-generator build && pnpm --filter @minkinpackages/demo build && pnpm --filter @minkinpackages/docs build",
     "dev": "pnpm --filter @minkinpackages/docs dev",
-    "test": "pnpm --filter @minkinpackages/api-sdk-generator-core test && pnpm --filter api-sdk-generator test",
-    "test:watch": "pnpm --parallel --filter @minkinpackages/api-sdk-generator-core --filter api-sdk-generator test:watch",
+    "test": "pnpm --filter @minkinad/api-sdk-generator-core test && pnpm --filter api-sdk-generator test",
+    "test:watch": "pnpm --parallel --filter @minkinad/api-sdk-generator-core --filter api-sdk-generator test:watch",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "typecheck": "pnpm --filter @minkinpackages/api-sdk-generator-core typecheck && pnpm --filter api-sdk-generator typecheck && pnpm --filter @minkinpackages/demo typecheck && pnpm --filter @minkinpackages/docs typecheck",
+    "typecheck": "pnpm --filter @minkinad/api-sdk-generator-core typecheck && pnpm --filter api-sdk-generator typecheck && pnpm --filter @minkinpackages/demo typecheck && pnpm --filter @minkinpackages/docs typecheck",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "clean": "pnpm -r clean && rm -rf node_modules",

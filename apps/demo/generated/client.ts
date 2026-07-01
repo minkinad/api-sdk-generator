@@ -47,7 +47,7 @@ export class ApiError extends Error {
 
   public static async fromResponse(response: Response): Promise<ApiError> {
     const contentType = response.headers.get("content-type") ?? "";
-    const body = contentType.includes("application/json")
+    const body = isJsonContentType(contentType)
       ? await response.json()
       : await response.text();
     return new ApiError(
@@ -153,11 +153,17 @@ async function parseResponse<T>(response: Response): Promise<T> {
 
   const contentType = response.headers.get("content-type") ?? "";
 
-  if (contentType.includes("application/json")) {
+  if (isJsonContentType(contentType)) {
     return (await response.json()) as T;
   }
 
   return (await response.text()) as T;
+}
+
+function isJsonContentType(contentType: string): boolean {
+  return (
+    contentType.includes("application/json") || contentType.includes("+json")
+  );
 }
 
 function mergeHeaders(

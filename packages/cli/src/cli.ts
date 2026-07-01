@@ -1,4 +1,4 @@
-import { ApiSdkGeneratorError } from '@minkinpackages/api-sdk-generator-core';
+import { ApiSdkGeneratorError } from '@minkinad/api-sdk-generator-core';
 import { Command } from 'commander';
 import pc from 'picocolors';
 

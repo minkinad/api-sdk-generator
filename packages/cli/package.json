@@ -4,7 +4,7 @@
   "description": "CLI for generating TypeScript SDK clients from OpenAPI 3.x schemas.",
   "type": "module",
   "bin": {
-    "api-sdk-generator": "./dist/cli.cjs"
+    "api-sdk-generator": "dist/cli.cjs"
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -38,7 +38,7 @@
     "clean": "rm -rf dist coverage"
   },
   "dependencies": {
-    "@minkinpackages/api-sdk-generator-core": "workspace:*",
+    "@minkinad/api-sdk-generator-core": "workspace:*",
     "commander": "^13.1.0",
     "picocolors": "^1.1.1"
   }

@@ -1,4 +1,4 @@
-# @minkinpackages/api-sdk-generator-core
+# @minkinad/api-sdk-generator-core
 
 ## 0.2.0
 

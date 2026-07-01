@@ -17,5 +17,5 @@ After publishing, verify:
 
 ```bash
 npm view api-sdk-generator version
-npm view @minkinpackages/api-sdk-generator-core version
+npm view @minkinad/api-sdk-generator-core version
 ```

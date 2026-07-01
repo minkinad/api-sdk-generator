@@ -1,4 +1,4 @@
-import { generateSdk } from '@minkinpackages/api-sdk-generator-core';
+import { generateSdk } from '@minkinad/api-sdk-generator-core';
 
 import { createCliLogger } from './logger.js';
 import {

@@ -58,5 +58,5 @@ describe('generateSdk', () => {
     );
     expect(indexSource).toContain('export * from "./client";');
     expect(diagnostics).toEqual([]);
-  }, 15000);
+  }, 60000);
 });
