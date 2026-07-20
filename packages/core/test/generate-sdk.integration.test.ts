@@ -56,7 +56,7 @@ describe('generateSdk', () => {
     expect(files).toEqual(
       expect.arrayContaining(['README.md', 'client.ts', 'index.ts', 'types.ts']),
     );
-    expect(indexSource).toContain('export * from "./client";');
+    expect(indexSource).toContain("export * from './client';");
     expect(diagnostics).toEqual([]);
   }, 60000);
 });
