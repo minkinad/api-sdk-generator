@@ -250,7 +250,9 @@ export function parseDocument(
       const responseTypeName = `${toTypeName(functionName)}Response`;
       const mergedParameters = mergeParameters(document, pathItem.parameters, operation.parameters);
       const queryParameters = mergedParameters.filter((parameter) => parameter.in === 'query');
-      const extractedPathParameters = mergedParameters.filter((parameter) => parameter.in === 'path');
+      const extractedPathParameters = mergedParameters.filter(
+        (parameter) => parameter.in === 'path',
+      );
       const requestBody = extractRequestBody(document, operation.requestBody);
       const response = parseResponse(document, operation);
       const hasRequestShape =
