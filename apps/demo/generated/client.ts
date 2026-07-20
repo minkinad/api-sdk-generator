@@ -11,7 +11,7 @@ import type {
   GetUsersResponse,
   CreateUserRequest,
   CreateUserResponse,
-} from "./types";
+} from './types';
 
 export interface ClientConfig {
   baseUrl?: string;
@@ -20,18 +20,9 @@ export interface ClientConfig {
 }
 
 export interface DemoSdkClient {
-  getUserById(
-    request: GetUserByIdRequest,
-    init?: RequestInit,
-  ): Promise<GetUserByIdResponse>;
-  getUsers(
-    request?: GetUsersRequest,
-    init?: RequestInit,
-  ): Promise<GetUsersResponse>;
-  createUser(
-    request: CreateUserRequest,
-    init?: RequestInit,
-  ): Promise<CreateUserResponse>;
+  getUserById(request: GetUserByIdRequest, init?: RequestInit): Promise<GetUserByIdResponse>;
+  getUsers(request?: GetUsersRequest, init?: RequestInit): Promise<GetUsersResponse>;
+  createUser(request: CreateUserRequest, init?: RequestInit): Promise<CreateUserResponse>;
 }
 
 export class ApiError extends Error {
@@ -40,21 +31,14 @@ export class ApiError extends Error {
 
   public constructor(status: number, message: string, body: unknown) {
     super(message);
-    this.name = "ApiError";
+    this.name = 'ApiError';
     this.status = status;
     this.body = body;
   }
 
   public static async fromResponse(response: Response): Promise<ApiError> {
-    const contentType = response.headers.get("content-type") ?? "";
-    const body = isJsonContentType(contentType)
-      ? await response.json()
-      : await response.text();
-    return new ApiError(
-      response.status,
-      `Request failed with status ${response.status}`,
-      body,
-    );
+    const body = await parseResponseBody(response);
+    return new ApiError(response.status, `Request failed with status ${response.status}`, body);
   }
 }
 
@@ -62,17 +46,14 @@ export function createClient(config: ClientConfig = {}): DemoSdkClient {
   const runtimeFetch = config.fetch ?? globalThis.fetch;
 
   if (!runtimeFetch) {
-    throw new Error("Fetch API is not available in the current runtime.");
+    throw new Error('Fetch API is not available in the current runtime.');
   }
 
   return {
-    async getUserById(
-      request,
-      init?: RequestInit,
-    ): Promise<GetUserByIdResponse> {
-      const url = new URL(
-        `/users/${encodeURIComponent(String(request.id))}`,
+    async getUserById(request, init?: RequestInit): Promise<GetUserByIdResponse> {
+      const url = resolveRequestUrl(
         resolveBaseUrl(config.baseUrl),
+        `/users/${encodeURIComponent(String(request.id))}`,
       );
       const searchParams = url.searchParams;
       void searchParams;
@@ -80,7 +61,7 @@ export function createClient(config: ClientConfig = {}): DemoSdkClient {
       const body = undefined;
       const response = await runtimeFetch(url, {
         ...init,
-        method: "GET",
+        method: 'GET',
         body,
         headers: mergeHeaders(headers, init?.headers),
       });
@@ -91,23 +72,20 @@ export function createClient(config: ClientConfig = {}): DemoSdkClient {
 
       return parseResponse<GetUserByIdResponse>(response);
     },
-    async getUsers(
-      request = {},
-      init?: RequestInit,
-    ): Promise<GetUsersResponse> {
-      const url = new URL(`/users`, resolveBaseUrl(config.baseUrl));
+    async getUsers(request = {}, init?: RequestInit): Promise<GetUsersResponse> {
+      const url = resolveRequestUrl(resolveBaseUrl(config.baseUrl), `/users`);
       const searchParams = url.searchParams;
       if (request.page !== undefined) {
-        searchParams.set("page", String(request.page));
+        searchParams.set('page', String(request.page));
       }
       if (request.status !== undefined) {
-        searchParams.set("status", String(request.status));
+        searchParams.set('status', String(request.status));
       }
       const headers = new Headers(config.headers);
       const body = undefined;
       const response = await runtimeFetch(url, {
         ...init,
-        method: "GET",
+        method: 'GET',
         body,
         headers: mergeHeaders(headers, init?.headers),
       });
@@ -119,16 +97,17 @@ export function createClient(config: ClientConfig = {}): DemoSdkClient {
       return parseResponse<GetUsersResponse>(response);
     },
     async createUser(request, init?: RequestInit): Promise<CreateUserResponse> {
-      const url = new URL(`/users`, resolveBaseUrl(config.baseUrl));
+      const url = resolveRequestUrl(resolveBaseUrl(config.baseUrl), `/users`);
       const searchParams = url.searchParams;
       void searchParams;
       const headers = new Headers(config.headers);
-      const body =
-        request.body !== undefined ? JSON.stringify(request.body) : undefined;
-      headers.set("content-type", "application/json");
+      const body = request.body !== undefined ? JSON.stringify(request.body) : undefined;
+      if (body !== undefined && !headers.has('content-type')) {
+        headers.set('content-type', 'application/json');
+      }
       const response = await runtimeFetch(url, {
         ...init,
-        method: "POST",
+        method: 'POST',
         body,
         headers: mergeHeaders(headers, init?.headers),
       });
@@ -143,33 +122,39 @@ export function createClient(config: ClientConfig = {}): DemoSdkClient {
 }
 
 function resolveBaseUrl(baseUrl?: string): string {
-  return baseUrl ?? "https://api.example.com";
+  return baseUrl ?? 'https://api.example.com';
+}
+
+function resolveRequestUrl(baseUrl: string, requestPath: string): URL {
+  const normalizedBaseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+  return new URL(requestPath.replace(/^\/+/, ''), normalizedBaseUrl);
 }
 
 async function parseResponse<T>(response: Response): Promise<T> {
-  if (response.status === 204) {
-    return undefined as T;
+  return (await parseResponseBody(response)) as T;
+}
+
+async function parseResponseBody(response: Response): Promise<unknown> {
+  if (response.status === 204 || response.status === 205) {
+    return undefined;
   }
 
-  const contentType = response.headers.get("content-type") ?? "";
+  const body = await response.text();
 
-  if (isJsonContentType(contentType)) {
-    return (await response.json()) as T;
+  if (!body) {
+    return undefined;
   }
 
-  return (await response.text()) as T;
+  const contentType = response.headers.get('content-type') ?? '';
+  return isJsonContentType(contentType) ? (JSON.parse(body) as unknown) : body;
 }
 
 function isJsonContentType(contentType: string): boolean {
-  return (
-    contentType.includes("application/json") || contentType.includes("+json")
-  );
+  const mediaType = contentType.split(';', 1)[0].trim().toLowerCase();
+  return mediaType === 'application/json' || mediaType.endsWith('+json');
 }
 
-function mergeHeaders(
-  baseHeaders: Headers,
-  initHeaders?: HeadersInit,
-): Headers {
+function mergeHeaders(baseHeaders: Headers, initHeaders?: HeadersInit): Headers {
   const merged = new Headers(baseHeaders);
 
   if (initHeaders) {

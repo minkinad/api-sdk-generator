@@ -13,7 +13,7 @@ export interface User {
   email: string;
   status: UserStatus;
 }
-export type UserStatus = "active" | "disabled";
+export type UserStatus = 'active' | 'disabled';
 
 export interface GetUserByIdRequest {
   id: string;
@@ -21,7 +21,7 @@ export interface GetUserByIdRequest {
 export type GetUserByIdResponse = User;
 export interface GetUsersRequest {
   page?: number;
-  status?: "active" | "disabled";
+  status?: 'active' | 'disabled';
 }
 export type GetUsersResponse = Array<User>;
 export interface CreateUserRequest {
