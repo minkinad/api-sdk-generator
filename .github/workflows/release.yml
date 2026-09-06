@@ -11,12 +11,15 @@ permissions:
   id-token: write
   pull-requests: write
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   release:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,14 +35,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           cache: pnpm
-          node-version: 20
-          registry-url: https://registry.npmjs.org
+          node-version: 24
+
+      - name: Setup npm with trusted publishing support
+        run: npm install --global npm@11
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Verify npm token
-        run: npm whoami
+      - name: Validate release
+        run: pnpm lint && pnpm typecheck && pnpm test && pnpm release:check
 
       - name: Create release PR or publish
         uses: changesets/action@v1
@@ -50,4 +55,3 @@ jobs:
           version: pnpm run version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

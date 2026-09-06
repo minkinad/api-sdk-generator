@@ -7,7 +7,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "pnpm --filter @minkinad/api-sdk-generator-core build && pnpm --filter api-sdk-generator build && pnpm --filter @minkinpackages/demo build && pnpm --filter @minkinpackages/docs build",
+    "build": "pnpm build:packages && pnpm --filter @minkinpackages/demo build && pnpm --filter @minkinpackages/docs build",
     "dev": "pnpm --filter @minkinpackages/docs dev",
     "test": "pnpm --filter @minkinad/api-sdk-generator-core test && pnpm --filter api-sdk-generator test",
     "test:watch": "pnpm --parallel --filter @minkinad/api-sdk-generator-core --filter api-sdk-generator test:watch",
@@ -19,10 +19,12 @@
     "clean": "pnpm -r clean && rm -rf node_modules",
     "changeset": "changeset",
     "version": "changeset version && pnpm install --no-frozen-lockfile",
-    "release": "pnpm build && changeset publish",
+    "release": "pnpm build:packages && node scripts/publish.mjs",
     "docs:dev": "pnpm --filter @minkinpackages/docs dev",
     "docs:build": "pnpm --filter @minkinpackages/docs build",
-    "docs:preview": "pnpm --filter @minkinpackages/docs preview"
+    "docs:preview": "pnpm --filter @minkinpackages/docs preview",
+    "build:packages": "pnpm --filter @minkinad/api-sdk-generator-core build && pnpm --filter api-sdk-generator build",
+    "release:check": "pnpm build:packages && node scripts/check-packages.mjs"
   },
   "devDependencies": {
     "@changesets/changelog-github": "^0.5.1",

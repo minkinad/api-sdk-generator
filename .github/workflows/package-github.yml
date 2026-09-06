@@ -38,4 +38,6 @@ jobs:
       - name: Publish scoped core package
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm --filter @minkinad/api-sdk-generator-core publish --no-git-checks --registry https://npm.pkg.github.com
+        run: |
+          npm pkg set publishConfig.registry=https://npm.pkg.github.com --prefix packages/core
+          pnpm --filter @minkinad/api-sdk-generator-core publish --no-git-checks --registry https://npm.pkg.github.com

@@ -11,13 +11,20 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "sideEffects": false,
   "engines": {
@@ -25,7 +32,6 @@
   },
   "publishConfig": {
     "access": "public",
-    "provenance": true,
     "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
@@ -35,11 +41,30 @@
     "test:watch": "vitest",
     "lint": "eslint src test",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "clean": "rm -rf dist coverage"
+    "clean": "rm -rf dist coverage",
+    "prepack": "pnpm run build"
   },
   "dependencies": {
     "@minkinad/api-sdk-generator-core": "workspace:*",
     "commander": "^13.1.0",
     "picocolors": "^1.1.1"
-  }
+  },
+  "license": "MIT",
+  "author": "minkinad",
+  "homepage": "https://minkinad.github.io/api-sdk-generator/",
+  "bugs": {
+    "url": "https://github.com/minkinad/api-sdk-generator/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/minkinad/api-sdk-generator.git",
+    "directory": "packages/cli"
+  },
+  "keywords": [
+    "openapi",
+    "sdk",
+    "typescript",
+    "codegen",
+    "fetch"
+  ]
 }

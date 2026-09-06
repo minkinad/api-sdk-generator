@@ -11,6 +11,9 @@ permissions:
 
 jobs:
   validate:
+    strategy:
+      matrix:
+        node: [20, 24]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -26,7 +29,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           cache: pnpm
-          node-version: 20
+          node-version: ${{ matrix.node }}
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -42,3 +45,6 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: Check npm packages
+        run: pnpm release:check

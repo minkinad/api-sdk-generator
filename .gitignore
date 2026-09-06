@@ -6,3 +6,4 @@ coverage
 **/.vitepress/dist
 **/.vitepress/.temp
 *.tsbuildinfo
+*.tgz

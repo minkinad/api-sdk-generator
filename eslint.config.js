@@ -51,5 +51,10 @@ module.exports = tseslint.config(
       ],
     },
   },
+  {
+    files: ['scripts/**/*.mjs'],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: { globals: globals.node },
+  },
   eslintConfigPrettier,
 );
