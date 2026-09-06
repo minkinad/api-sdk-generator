@@ -11,15 +11,16 @@ export function run(command, args, options = {}) {
     cwd: root,
     encoding: 'utf8',
     stdio: ['inherit', 'pipe', 'inherit'],
+    timeout: 180_000,
     ...options,
   });
 }
 
 /** pnpm replaces workspace:* with publishable versions inside each archive. */
-export async function packPackages(destination) {
+export async function packPackages(destination, directories = ['core', 'cli']) {
   const packages = [];
   // Publish dependencies before their consumers.
-  for (const directory of ['core', 'cli']) {
+  for (const directory of directories) {
     const cwd = path.join(root, 'packages', directory);
     const metadata = JSON.parse(await readFile(path.join(cwd, 'package.json'), 'utf8'));
     run('pnpm', ['pack', '--pack-destination', destination], { cwd });

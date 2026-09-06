@@ -9,7 +9,7 @@
   "scripts": {
     "build": "pnpm build:packages && pnpm --filter @minkinpackages/demo build && pnpm --filter @minkinpackages/docs build",
     "dev": "pnpm --filter @minkinpackages/docs dev",
-    "test": "pnpm --filter @minkinad/api-sdk-generator-core test && pnpm --filter api-sdk-generator test",
+    "test": "pnpm test:unit && pnpm test:scripts",
     "test:watch": "pnpm --parallel --filter @minkinad/api-sdk-generator-core --filter api-sdk-generator test:watch",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -19,12 +19,21 @@
     "clean": "pnpm -r clean && rm -rf node_modules",
     "changeset": "changeset",
     "version": "changeset version && pnpm install --no-frozen-lockfile",
-    "release": "pnpm build:packages && node scripts/publish.mjs",
+    "release": "node scripts/publish.mjs",
     "docs:dev": "pnpm --filter @minkinpackages/docs dev",
     "docs:build": "pnpm --filter @minkinpackages/docs build",
     "docs:preview": "pnpm --filter @minkinpackages/docs preview",
     "build:packages": "pnpm --filter @minkinad/api-sdk-generator-core build && pnpm --filter api-sdk-generator build",
-    "release:check": "pnpm build:packages && node scripts/check-packages.mjs"
+    "release:check": "node scripts/check-packages.mjs",
+    "test:unit": "pnpm --filter @minkinad/api-sdk-generator-core test && pnpm --filter api-sdk-generator test",
+    "test:scripts": "node --test scripts/test/*.test.mjs",
+    "release:github": "node scripts/github-release.mjs",
+    "release:github-packages": "node scripts/publish-github.mjs",
+    "version:packages": "changeset version && pnpm install --no-frozen-lockfile",
+    "demo:check": "pnpm --filter api-sdk-generator generate --file apps/demo/openapi.json --output apps/demo/generated --name demo-sdk --check",
+    "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm demo:check && pnpm release:check",
+    "audit:prod": "pnpm audit --prod --audit-level=high",
+    "release:ci": "pnpm release && pnpm release:github"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.1",
