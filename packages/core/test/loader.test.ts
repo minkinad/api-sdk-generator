@@ -42,4 +42,40 @@ describe('loader', () => {
       loadOpenApiDocument({ file: 'a.json', url: 'https://example.com/openapi.json' }),
     ).rejects.toBeInstanceOf(SchemaLoadError);
   });
+  it('loads YAML from a URL without relying on its extension or content type', async () => {
+    const document = await loadOpenApiDocumentFromUrl(
+      'https://example.com/schema',
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(`
+openapi: 3.0.3
+info:
+  title: YAML API
+paths: {}
+`),
+        ),
+      ),
+    );
+    expect(document.info.title).toBe('YAML API');
+  });
+
+  it('rejects malformed YAML and duplicate keys with actionable errors', async () => {
+    for (const content of ['paths: [', 'openapi: 3.0.3\nopenapi: 3.0.0']) {
+      await expect(
+        loadOpenApiDocumentFromUrl(
+          'https://example.com/schema',
+          vi.fn(() => Promise.resolve(new Response(content))),
+        ),
+      ).rejects.toThrow('Invalid JSON or YAML');
+    }
+  });
+
+  it('preserves schema validation errors', async () => {
+    await expect(
+      loadOpenApiDocumentFromUrl(
+        'https://example.com/schema',
+        vi.fn(() => Promise.resolve(new Response('openapi: 2.0'))),
+      ),
+    ).rejects.toMatchObject({ code: 'SCHEMA_VALIDATION_ERROR' });
+  });
 });

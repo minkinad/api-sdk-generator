@@ -13,4 +13,31 @@ describe('resolver', () => {
 
     expect(statusSchema.enum).toEqual(['active', 'disabled']);
   });
+  it('decodes JSON Pointer tokens and follows component aliases', () => {
+    const document = validateOpenApiDocument({
+      openapi: '3.0.3',
+      info: { title: 'Refs' },
+      paths: {},
+      components: {
+        schemas: { 'a/b~c': { type: 'string' }, Alias: { $ref: '#/components/schemas/a~1b~0c' } },
+      },
+    });
+    expect(resolveSchema(document, { $ref: '#/components/schemas/Alias' })).toEqual({
+      type: 'string',
+    });
+  });
+
+  it('rejects alias cycles without overflowing the call stack', () => {
+    const document = validateOpenApiDocument({
+      openapi: '3.0.3',
+      info: { title: 'Refs' },
+      paths: {},
+      components: {
+        schemas: { A: { $ref: '#/components/schemas/B' }, B: { $ref: '#/components/schemas/A' } },
+      },
+    });
+    expect(() => resolveSchema(document, { $ref: '#/components/schemas/A' })).toThrow(
+      'Circular component reference',
+    );
+  });
 });

@@ -1,4 +1,5 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 
 import { OutputWriteError } from './errors.js';
@@ -45,6 +46,19 @@ export async function writeGeneratedFiles(
     const resolvedFiles = resolveGeneratedFiles(outputDir, files);
 
     if (clean) {
+      const outputRoot = path.resolve(outputDir);
+      const relativeCwd = path.relative(outputRoot, process.cwd());
+      if (
+        outputRoot === os.homedir() ||
+        relativeCwd === '' ||
+        (relativeCwd !== '..' &&
+          !relativeCwd.startsWith(`..${path.sep}`) &&
+          !path.isAbsolute(relativeCwd))
+      ) {
+        throw new OutputWriteError(
+          'Refusing to clean the home directory, working directory, or its ancestors.',
+        );
+      }
       await rm(outputDir, { force: true, recursive: true });
     }
 
@@ -63,4 +77,26 @@ export async function writeGeneratedFiles(
 
     throw new OutputWriteError(`Failed to write generated SDK to "${outputDir}".`, error);
   }
+}
+
+/** Compare only generated files; unrelated files are left alone. */
+export async function compareGeneratedFiles(
+  outputDir: string,
+  files: GeneratedFile[],
+): Promise<string[]> {
+  const changedFiles: string[] = [];
+  for (const file of resolveGeneratedFiles(outputDir, files)) {
+    try {
+      if ((await readFile(file.fullPath, 'utf8')) !== file.content) {
+        changedFiles.push(file.path);
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        changedFiles.push(file.path);
+      } else {
+        throw new OutputWriteError(`Failed to compare generated file "${file.fullPath}".`, error);
+      }
+    }
+  }
+  return changedFiles;
 }

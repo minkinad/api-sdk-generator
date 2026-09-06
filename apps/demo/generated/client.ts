@@ -9,9 +9,9 @@ import type {
   GetUserByIdResponse,
   GetUsersRequest,
   GetUsersResponse,
-  CreateUserRequest,
+  CreateUserRequest2,
   CreateUserResponse,
-} from './types';
+} from './types.js';
 
 export interface ClientConfig {
   baseUrl?: string;
@@ -22,23 +22,35 @@ export interface ClientConfig {
 export interface DemoSdkClient {
   getUserById(request: GetUserByIdRequest, init?: RequestInit): Promise<GetUserByIdResponse>;
   getUsers(request?: GetUsersRequest, init?: RequestInit): Promise<GetUsersResponse>;
-  createUser(request: CreateUserRequest, init?: RequestInit): Promise<CreateUserResponse>;
+  createUser(request: CreateUserRequest2, init?: RequestInit): Promise<CreateUserResponse>;
 }
 
 export class ApiError extends Error {
   public readonly body: unknown;
   public readonly status: number;
+  public readonly headers: Headers;
 
-  public constructor(status: number, message: string, body: unknown) {
+  public constructor(
+    status: number,
+    message: string,
+    body: unknown,
+    headers: Headers = new Headers(),
+  ) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.body = body;
+    this.headers = headers;
   }
 
   public static async fromResponse(response: Response): Promise<ApiError> {
-    const body = await parseResponseBody(response);
-    return new ApiError(response.status, `Request failed with status ${response.status}`, body);
+    const body = await parseResponseBody(response.clone()).catch(() => response.text());
+    return new ApiError(
+      response.status,
+      `Request failed with status ${response.status}`,
+      body,
+      response.headers,
+    );
   }
 }
 
@@ -53,7 +65,7 @@ export function createClient(config: ClientConfig = {}): DemoSdkClient {
     async getUserById(request, init?: RequestInit): Promise<GetUserByIdResponse> {
       const url = resolveRequestUrl(
         resolveBaseUrl(config.baseUrl),
-        `/users/${encodeURIComponent(String(request.id))}`,
+        '/users/' + encodeURIComponent(String(request['id'])) + '',
       );
       const searchParams = url.searchParams;
       void searchParams;
@@ -73,14 +85,10 @@ export function createClient(config: ClientConfig = {}): DemoSdkClient {
       return parseResponse<GetUserByIdResponse>(response);
     },
     async getUsers(request = {}, init?: RequestInit): Promise<GetUsersResponse> {
-      const url = resolveRequestUrl(resolveBaseUrl(config.baseUrl), `/users`);
+      const url = resolveRequestUrl(resolveBaseUrl(config.baseUrl), '/users');
       const searchParams = url.searchParams;
-      if (request.page !== undefined) {
-        searchParams.set('page', String(request.page));
-      }
-      if (request.status !== undefined) {
-        searchParams.set('status', String(request.status));
-      }
+      appendQueryParameter(searchParams, 'page', request['page'], true, ',');
+      appendQueryParameter(searchParams, 'status', request['status'], true, ',');
       const headers = new Headers(config.headers);
       const body = undefined;
       const response = await runtimeFetch(url, {
@@ -97,7 +105,7 @@ export function createClient(config: ClientConfig = {}): DemoSdkClient {
       return parseResponse<GetUsersResponse>(response);
     },
     async createUser(request, init?: RequestInit): Promise<CreateUserResponse> {
-      const url = resolveRequestUrl(resolveBaseUrl(config.baseUrl), `/users`);
+      const url = resolveRequestUrl(resolveBaseUrl(config.baseUrl), '/users');
       const searchParams = url.searchParams;
       void searchParams;
       const headers = new Headers(config.headers);
@@ -152,6 +160,25 @@ async function parseResponseBody(response: Response): Promise<unknown> {
 function isJsonContentType(contentType: string): boolean {
   const mediaType = contentType.split(';', 1)[0].trim().toLowerCase();
   return mediaType === 'application/json' || mediaType.endsWith('+json');
+}
+
+function appendQueryParameter(
+  params: URLSearchParams,
+  name: string,
+  value: unknown,
+  explode: boolean,
+  separator: string,
+): void {
+  if (value === undefined) return;
+  if (Array.isArray(value)) {
+    if (explode) {
+      for (const item of value) params.append(name, String(item));
+    } else {
+      params.set(name, value.map(String).join(separator));
+    }
+  } else {
+    params.set(name, String(value));
+  }
 }
 
 function mergeHeaders(baseHeaders: Headers, initHeaders?: HeadersInit): Headers {

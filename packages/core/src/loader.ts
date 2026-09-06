@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { parseDocument as parseYamlDocument } from 'yaml';
 
-import { SchemaLoadError } from './errors.js';
+import { ApiSdkGeneratorError, SchemaLoadError } from './errors.js';
 import type { Logger } from './logger.js';
 import type { GenerateSdkInput, OpenApiDocument } from './types.js';
 import { validateOpenApiDocument } from './validator.js';
@@ -9,6 +10,16 @@ import { validateOpenApiDocument } from './validator.js';
 export interface LoadSchemaOptions {
   fetchImplementation?: typeof fetch;
   logger?: Logger;
+}
+
+function parseSchema(content: string): OpenApiDocument {
+  // JSON is a YAML subset. Limit aliases and reject duplicate keys rather than
+  // silently replacing definitions in an API contract.
+  const parsed = parseYamlDocument(content, { uniqueKeys: true });
+  if (parsed.errors.length > 0) {
+    throw new SchemaLoadError(`Invalid JSON or YAML: ${parsed.errors[0].message}`);
+  }
+  return validateOpenApiDocument(parsed.toJS({ maxAliasCount: 100 }) as unknown);
 }
 
 export async function loadOpenApiDocument(
@@ -35,14 +46,10 @@ export async function loadOpenApiDocumentFromFile(
   try {
     logger?.debug(`Loading OpenAPI schema from file: ${filePath}`);
     const content = await readFile(filePath, 'utf8');
-    const document = JSON.parse(content) as unknown;
-    return validateOpenApiDocument(document);
+    return parseSchema(content);
   } catch (error) {
-    if (error instanceof SyntaxError) {
-      throw new SchemaLoadError(
-        `Failed to parse JSON from file "${path.resolve(filePath)}".`,
-        error,
-      );
+    if (error instanceof ApiSdkGeneratorError) {
+      throw error;
     }
 
     throw new SchemaLoadError(
@@ -73,10 +80,9 @@ export async function loadOpenApiDocumentFromUrl(
       );
     }
 
-    const document = (await response.json()) as unknown;
-    return validateOpenApiDocument(document);
+    return parseSchema(await response.text());
   } catch (error) {
-    if (error instanceof SchemaLoadError) {
+    if (error instanceof ApiSdkGeneratorError) {
       throw error;
     }
 

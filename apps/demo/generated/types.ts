@@ -4,6 +4,8 @@
  * Do not edit manually.
  */
 
+export {};
+
 export interface CreateUserRequest {
   email: string;
   status?: UserStatus;
@@ -21,10 +23,10 @@ export interface GetUserByIdRequest {
 export type GetUserByIdResponse = User;
 export interface GetUsersRequest {
   page?: number;
-  status?: 'active' | 'disabled';
+  status?: UserStatus;
 }
 export type GetUsersResponse = Array<User>;
-export interface CreateUserRequest {
+export interface CreateUserRequest2 {
   body: CreateUserRequest;
 }
 export type CreateUserResponse = User;

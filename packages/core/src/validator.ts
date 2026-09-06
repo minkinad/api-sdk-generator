@@ -4,7 +4,7 @@ import { SchemaValidationError } from './errors.js';
 import type { OpenApiDocument } from './types.js';
 
 function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 export function validateOpenApiDocument(value: unknown): OpenApiDocument {

@@ -2,7 +2,7 @@ import type { OpenAPIV3 } from 'openapi-types';
 
 import type { Logger } from './logger.js';
 
-export type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
+export type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete' | 'head' | 'options';
 
 export type OpenApiDocument = OpenAPIV3.Document & {
   openapi: string;
@@ -21,6 +21,10 @@ export interface GenerateSdkOptions {
   sdkName?: string;
   baseUrl?: string;
   clean?: boolean;
+  /** Generate and format files without writing them. */
+  dryRun?: boolean;
+  /** Compare generated files with disk without writing them. */
+  check?: boolean;
   fetchImplementation?: typeof fetch;
   logger?: Logger;
 }
@@ -31,6 +35,8 @@ export interface GeneratedFile {
 }
 
 export interface GenerateSdkResult {
+  /** Missing or outdated files, populated in check mode. */
+  changedFiles: string[];
   files: GeneratedFile[];
   operations: number;
   outputDir: string;
@@ -38,6 +44,8 @@ export interface GenerateSdkResult {
 }
 
 export interface ParsedParameter {
+  explode?: boolean;
+  style?: string;
   description?: string;
   in: 'path' | 'query';
   name: string;

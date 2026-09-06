@@ -1,31 +1,26 @@
-import { toPropertyAccessor, toTypeName } from '../naming.js';
+import { toTypeName } from '../naming.js';
 import type { ParsedDocument, ParsedOperation } from '../types.js';
 
 function renderTemplatePath(path: string, operation: ParsedOperation): string {
-  let rendered = path;
-
-  for (const parameter of operation.pathParameters) {
-    rendered = rendered.replace(
-      `{${parameter.name}}`,
-      `\${encodeURIComponent(String(request.${toPropertyAccessor(parameter.name)}))}`,
-    );
+  const parts: string[] = [];
+  let offset = 0;
+  for (const match of path.matchAll(/\{([^}]+)\}/g)) {
+    const parameter = operation.pathParameters.find((item) => item.name === match[1]);
+    if (!parameter) continue;
+    parts.push(JSON.stringify(path.slice(offset, match.index)));
+    parts.push(`encodeURIComponent(String(request[${JSON.stringify(parameter.name)}]))`);
+    offset = match.index + match[0].length;
   }
-
-  return `\`${rendered}\``;
+  parts.push(JSON.stringify(path.slice(offset)));
+  return parts.join(' + ');
 }
 
 function renderQueryLines(operation: ParsedOperation): string[] {
-  if (operation.queryParameters.length === 0) {
-    return [];
-  }
-
   return operation.queryParameters.map((parameter) => {
-    const accessor = `request.${toPropertyAccessor(parameter.name)}`;
-    return [
-      `      if (${accessor} !== undefined) {`,
-      `        searchParams.set(${JSON.stringify(parameter.name)}, String(${accessor}));`,
-      '      }',
-    ].join('\n');
+    const style = parameter.style ?? 'form';
+    const explode = parameter.explode ?? style === 'form';
+    const separator = style === 'spaceDelimited' ? ' ' : style === 'pipeDelimited' ? '|' : ',';
+    return `      appendQueryParameter(searchParams, ${JSON.stringify(parameter.name)}, request[${JSON.stringify(parameter.name)}], ${explode}, ${JSON.stringify(separator)});`;
   });
 }
 
@@ -96,13 +91,17 @@ export function generateClientSource(parsed: ParsedDocument): string {
     ' * Do not edit manually.',
     ' */',
     '',
-    'import type {',
-    ...parsed.operations.flatMap((operation) => [
-      `  ${operation.requestTypeName},`,
-      `  ${operation.responseTypeName},`,
-    ]),
-    "} from './types';",
-    '',
+    ...(parsed.operations.length > 0
+      ? [
+          'import type {',
+          ...parsed.operations.flatMap((operation) => [
+            ...(operation.hasRequestShape ? [`  ${operation.requestTypeName},`] : []),
+            `  ${operation.responseTypeName},`,
+          ]),
+          "} from './types.js';",
+          '',
+        ]
+      : []),
     'export interface ClientConfig {',
     '  baseUrl?: string;',
     '  fetch?: typeof fetch;',
@@ -116,17 +115,19 @@ export function generateClientSource(parsed: ParsedDocument): string {
     'export class ApiError extends Error {',
     '  public readonly body: unknown;',
     '  public readonly status: number;',
+    '  public readonly headers: Headers;',
     '',
-    '  public constructor(status: number, message: string, body: unknown) {',
+    '  public constructor(status: number, message: string, body: unknown, headers: Headers = new Headers()) {',
     '    super(message);',
     '    this.name = "ApiError";',
     '    this.status = status;',
     '    this.body = body;',
+    '    this.headers = headers;',
     '  }',
     '',
     '  public static async fromResponse(response: Response): Promise<ApiError> {',
-    '    const body = await parseResponseBody(response);',
-    '    return new ApiError(response.status, `Request failed with status ${response.status}`, body);',
+    '    const body = await parseResponseBody(response.clone()).catch(() => response.text());',
+    '    return new ApiError(response.status, `Request failed with status ${response.status}`, body, response.headers);',
     '  }',
     '}',
     '',
@@ -142,19 +143,23 @@ export function generateClientSource(parsed: ParsedDocument): string {
     '  };',
     '}',
     '',
-    'function resolveBaseUrl(baseUrl?: string): string {',
-    `  return baseUrl ?? ${JSON.stringify(parsed.defaultBaseUrl ?? 'http://localhost')};`,
-    '}',
-    '',
-    'function resolveRequestUrl(baseUrl: string, requestPath: string): URL {',
-    '  const normalizedBaseUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;',
-    '  return new URL(requestPath.replace(/^\\/+/, ""), normalizedBaseUrl);',
-    '}',
-    '',
-    'async function parseResponse<T>(response: Response): Promise<T> {',
-    '  return (await parseResponseBody(response)) as T;',
-    '}',
-    '',
+    ...(parsed.operations.length > 0
+      ? [
+          'function resolveBaseUrl(baseUrl?: string): string {',
+          `  return baseUrl ?? ${JSON.stringify(parsed.defaultBaseUrl ?? 'http://localhost')};`,
+          '}',
+          '',
+          'function resolveRequestUrl(baseUrl: string, requestPath: string): URL {',
+          '  const normalizedBaseUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;',
+          '  return new URL(requestPath.replace(/^\\/+/, ""), normalizedBaseUrl);',
+          '}',
+          '',
+          'async function parseResponse<T>(response: Response): Promise<T> {',
+          '  return (await parseResponseBody(response)) as T;',
+          '}',
+          '',
+        ]
+      : []),
     'async function parseResponseBody(response: Response): Promise<unknown> {',
     '  if (response.status === 204 || response.status === 205) {',
     '    return undefined;',
@@ -175,16 +180,37 @@ export function generateClientSource(parsed: ParsedDocument): string {
     '  return mediaType === "application/json" || mediaType.endsWith("+json");',
     '}',
     '',
-    'function mergeHeaders(baseHeaders: Headers, initHeaders?: HeadersInit): Headers {',
-    '  const merged = new Headers(baseHeaders);',
-    '',
-    '  if (initHeaders) {',
-    '    const overlay = new Headers(initHeaders);',
-    '    overlay.forEach((value, key) => merged.set(key, value));',
-    '  }',
-    '',
-    '  return merged;',
-    '}',
-    '',
+    ...(parsed.operations.some((operation) => operation.queryParameters.length > 0)
+      ? [
+          'function appendQueryParameter(params: URLSearchParams, name: string, value: unknown, explode: boolean, separator: string): void {',
+          '  if (value === undefined) return;',
+          '  if (Array.isArray(value)) {',
+          '    if (explode) {',
+          '      for (const item of value) params.append(name, String(item));',
+          '    } else {',
+          '      params.set(name, value.map(String).join(separator));',
+          '    }',
+          '  } else {',
+          '    params.set(name, String(value));',
+          '  }',
+          '}',
+          '',
+        ]
+      : []),
+    ...(parsed.operations.length > 0
+      ? [
+          'function mergeHeaders(baseHeaders: Headers, initHeaders?: HeadersInit): Headers {',
+          '  const merged = new Headers(baseHeaders);',
+          '',
+          '  if (initHeaders) {',
+          '    const overlay = new Headers(initHeaders);',
+          '    overlay.forEach((value, key) => merged.set(key, value));',
+          '  }',
+          '',
+          '  return merged;',
+          '}',
+          '',
+        ]
+      : []),
   ].join('\n');
 }

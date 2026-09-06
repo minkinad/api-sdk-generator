@@ -2,7 +2,7 @@ import type { OpenAPIV3 } from 'openapi-types';
 
 import { SchemaValidationError, UnsupportedSchemaError } from './errors.js';
 import { createFunctionName, deriveSdkName, toTypeName } from './naming.js';
-import { isReferenceObject, resolveSchema } from './resolver.js';
+import { resolveLocalComponent, resolveSchema } from './resolver.js';
 import type {
   HttpMethod,
   OpenApiDocument,
@@ -14,7 +14,15 @@ import type {
   SchemaLike,
 } from './types.js';
 
-const SUPPORTED_METHODS: readonly HttpMethod[] = ['get', 'post', 'put', 'patch', 'delete'] as const;
+const SUPPORTED_METHODS: readonly HttpMethod[] = [
+  'get',
+  'post',
+  'put',
+  'patch',
+  'delete',
+  'head',
+  'options',
+];
 
 function getParameterSchema(
   document: OpenApiDocument,
@@ -26,9 +34,8 @@ function getParameterSchema(
     );
   }
 
-  return isReferenceObject(parameter.schema)
-    ? resolveSchema(document, parameter.schema)
-    : parameter.schema;
+  resolveSchema(document, parameter.schema);
+  return parameter.schema;
 }
 
 function dereferenceParameter(
@@ -39,20 +46,7 @@ function dereferenceParameter(
     return parameter;
   }
 
-  const prefix = '#/components/parameters/';
-
-  if (!parameter.$ref.startsWith(prefix)) {
-    throw new SchemaValidationError(`Unsupported parameter reference "${parameter.$ref}".`);
-  }
-
-  const parameterName = parameter.$ref.slice(prefix.length);
-  const resolved = document.components?.parameters?.[parameterName];
-
-  if (!resolved || '$ref' in resolved) {
-    throw new SchemaValidationError(`Unable to resolve parameter reference "${parameter.$ref}".`);
-  }
-
-  return resolved;
+  return resolveLocalComponent(parameter, document.components?.parameters, 'parameters');
 }
 
 function extractParameters(
@@ -64,6 +58,8 @@ function extractParameters(
     .filter((parameter) => parameter.in === 'path' || parameter.in === 'query')
     .map((parameter) => ({
       description: parameter.description,
+      explode: parameter.explode,
+      style: parameter.style,
       in: parameter.in === 'path' ? 'path' : 'query',
       name: parameter.name,
       required: parameter.in === 'path' ? true : (parameter.required ?? false),
@@ -137,22 +133,7 @@ function resolveRequestBody(
   document: OpenApiDocument,
   requestBody: OpenAPIV3.ReferenceObject,
 ): OpenAPIV3.RequestBodyObject {
-  const prefix = '#/components/requestBodies/';
-
-  if (!requestBody.$ref.startsWith(prefix)) {
-    throw new SchemaValidationError(`Unsupported requestBody reference "${requestBody.$ref}".`);
-  }
-
-  const name = requestBody.$ref.slice(prefix.length);
-  const resolved = document.components?.requestBodies?.[name];
-
-  if (!resolved || '$ref' in resolved) {
-    throw new SchemaValidationError(
-      `Unable to resolve requestBody reference "${requestBody.$ref}".`,
-    );
-  }
-
-  return resolved;
+  return resolveLocalComponent(requestBody, document.components?.requestBodies, 'requestBodies');
 }
 
 function extractResponse(operation: OpenAPIV3.OperationObject): {
@@ -160,7 +141,7 @@ function extractResponse(operation: OpenAPIV3.OperationObject): {
   statusCode: string;
 } {
   const entries = Object.entries(operation.responses ?? {});
-  const successfulEntry = entries.find(([status]) => /^2\d\d$/.test(status)) ?? entries[0];
+  const successfulEntry = entries.find(([status]) => /^2(?:\d\d|XX)$/i.test(status)) ?? entries[0];
 
   if (!successfulEntry) {
     return {
@@ -185,20 +166,7 @@ function resolveResponse(
     return response;
   }
 
-  const prefix = '#/components/responses/';
-
-  if (!response.$ref.startsWith(prefix)) {
-    throw new SchemaValidationError(`Unsupported response reference "${response.$ref}".`);
-  }
-
-  const name = response.$ref.slice(prefix.length);
-  const resolved = document.components?.responses?.[name];
-
-  if (!resolved || '$ref' in resolved) {
-    throw new SchemaValidationError(`Unable to resolve response reference "${response.$ref}".`);
-  }
-
-  return resolved;
+  return resolveLocalComponent(response, document.components?.responses, 'responses');
 }
 
 function parseResponse(
@@ -232,12 +200,28 @@ export function parseDocument(
   } = {},
 ): ParsedDocument {
   const operations: ParsedOperation[] = [];
+  const functionNames = new Set<string>();
+  const typeNames = new Set<string>([
+    'ClientConfig',
+    'ApiError',
+    `${deriveSdkName(options.sdkName ?? document.info.title)}Client`,
+  ]);
+  for (const name of Object.keys(document.components?.schemas ?? {})) {
+    const typeName = toTypeName(name);
+    if (typeNames.has(typeName)) {
+      throw new SchemaValidationError(`Duplicate or reserved generated type name "${typeName}".`);
+    }
+    typeNames.add(typeName);
+  }
 
   for (const [pathKey, pathItem] of Object.entries(document.paths ?? {})) {
     if (!pathItem || '$ref' in pathItem) {
       throw new UnsupportedSchemaError(`Path-level $ref is not supported for path "${pathKey}".`);
     }
 
+    if (pathItem.trace) {
+      throw new UnsupportedSchemaError('TRACE operations are not supported by the Fetch API.');
+    }
     for (const method of SUPPORTED_METHODS) {
       const operation = pathItem[method];
 
@@ -246,8 +230,22 @@ export function parseDocument(
       }
 
       const functionName = createFunctionName(method, pathKey, operation.operationId);
-      const requestTypeName = `${toTypeName(functionName)}Request`;
-      const responseTypeName = `${toTypeName(functionName)}Response`;
+
+      if (functionNames.has(functionName)) {
+        throw new SchemaValidationError(
+          `Duplicate generated operation name "${functionName}". Use unique operationId values.`,
+        );
+      }
+      functionNames.add(functionName);
+      const allocateTypeName = (base: string): string => {
+        let name = base;
+        let suffix = 2;
+        while (typeNames.has(name)) name = `${base}${suffix++}`;
+        typeNames.add(name);
+        return name;
+      };
+      const requestTypeName = allocateTypeName(`${toTypeName(functionName)}Request`);
+      const responseTypeName = allocateTypeName(`${toTypeName(functionName)}Response`);
       const mergedParameters = mergeParameters(document, pathItem.parameters, operation.parameters);
       const queryParameters = mergedParameters.filter((parameter) => parameter.in === 'query');
       const extractedPathParameters = mergedParameters.filter(
@@ -255,6 +253,35 @@ export function parseDocument(
       );
       const requestBody = extractRequestBody(document, operation.requestBody);
       const response = parseResponse(document, operation);
+      const requestNames = new Set<string>();
+      for (const parameter of mergedParameters) {
+        if (requestNames.has(parameter.name) || (parameter.name === 'body' && requestBody)) {
+          throw new UnsupportedSchemaError(
+            `Request field "${parameter.name}" collides in ${method.toUpperCase()} ${pathKey}.`,
+          );
+        }
+        requestNames.add(parameter.name);
+        if (parameter.in === 'query') {
+          const schema = resolveSchema(document, parameter.schema);
+          const style = parameter.style ?? 'form';
+          if (
+            schema.type === 'object' ||
+            schema.properties ||
+            !['form', 'spaceDelimited', 'pipeDelimited'].includes(style)
+          ) {
+            throw new UnsupportedSchemaError(
+              `Unsupported query serialization for "${parameter.name}": ${style}.`,
+            );
+          }
+        }
+      }
+      for (const match of pathKey.matchAll(/\{([^}]+)\}/g)) {
+        if (!extractedPathParameters.some((parameter) => parameter.name === match[1])) {
+          throw new SchemaValidationError(
+            `Missing path parameter "${match[1]}" in ${method.toUpperCase()} ${pathKey}.`,
+          );
+        }
+      }
       const hasRequestShape =
         extractedPathParameters.length + queryParameters.length > 0 || Boolean(requestBody);
 

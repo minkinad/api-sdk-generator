@@ -5,6 +5,8 @@ import { CliUsageError } from './errors.js';
 export interface GenerateCommandOptionsInput {
   baseUrl?: string;
   clean?: boolean;
+  check?: boolean;
+  dryRun?: boolean;
   file?: string;
   name?: string;
   output?: string;
@@ -15,6 +17,8 @@ export interface GenerateCommandOptionsInput {
 export interface NormalizedGenerateCommandOptions {
   baseUrl?: string;
   clean: boolean;
+  check: boolean;
+  dryRun: boolean;
   input: {
     file?: string;
     url?: string;
@@ -29,6 +33,10 @@ export function normalizeGenerateCommandOptions(
 ): NormalizedGenerateCommandOptions {
   const workingDirectory = process.env.INIT_CWD ?? process.cwd();
 
+  if (options.check && options.dryRun) {
+    throw new CliUsageError('Use either --check or --dry-run, not both.');
+  }
+
   if (!options.output) {
     throw new CliUsageError('The --output option is required.');
   }
@@ -42,7 +50,7 @@ export function normalizeGenerateCommandOptions(
 
   if (options.url) {
     try {
-      new URL(options.url);
+      if (!['http:', 'https:'].includes(new URL(options.url).protocol)) throw new Error();
     } catch {
       throw new CliUsageError(`Invalid --url value: "${options.url}".`);
     }
@@ -50,7 +58,7 @@ export function normalizeGenerateCommandOptions(
 
   if (options.baseUrl) {
     try {
-      new URL(options.baseUrl);
+      if (!['http:', 'https:'].includes(new URL(options.baseUrl).protocol)) throw new Error();
     } catch {
       throw new CliUsageError(`Invalid --base-url value: "${options.baseUrl}".`);
     }
@@ -59,6 +67,8 @@ export function normalizeGenerateCommandOptions(
   return {
     baseUrl: options.baseUrl,
     clean: options.clean ?? false,
+    check: options.check ?? false,
+    dryRun: options.dryRun ?? false,
     input: {
       file: options.file ? path.resolve(workingDirectory, options.file) : undefined,
       url: options.url,

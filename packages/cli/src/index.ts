@@ -1,5 +1,6 @@
 import { generateSdk } from '@minkinad/api-sdk-generator-core';
 
+import { CliUsageError } from './errors.js';
 import { createCliLogger } from './logger.js';
 import {
   normalizeGenerateCommandOptions,
@@ -25,12 +26,27 @@ export async function executeGenerateCommand(
   const result = await generateSdk({
     baseUrl: options.baseUrl,
     clean: options.clean,
+    check: options.check,
+    dryRun: options.dryRun,
     input: options.input,
     logger,
     outputDir: options.outputDir,
     sdkName: options.sdkName,
   });
 
+  if (options.check) {
+    if (result.changedFiles.length > 0) {
+      throw new CliUsageError(`Generated SDK is out of date: ${result.changedFiles.join(', ')}`, 2);
+    }
+    logger.info('Generated SDK is up to date');
+    return;
+  }
+  if (options.dryRun) {
+    logger.info(
+      `Would generate ${result.files.length} files for ${result.operations} operations: ${result.files.map((file) => file.path).join(', ')}`,
+    );
+    return;
+  }
   logger.info(
     `Generated ${result.files.length} files for ${result.operations} operations in ${result.outputDir}`,
   );

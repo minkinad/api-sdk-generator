@@ -31,7 +31,9 @@ describe('client generator', () => {
     expect(source).toContain(
       'async getUserById(request, init?: RequestInit): Promise<GetUserByIdResponse>',
     );
-    expect(source).toContain('searchParams.set("page", String(request.page));');
+    expect(source).toContain(
+      'appendQueryParameter(searchParams, "page", request["page"], true, ",");',
+    );
     expect(source).toContain('headers.set("content-type", "application/json");');
   });
 
@@ -98,5 +100,83 @@ describe('client generator', () => {
     expect(source).toContain(
       'return mediaType === "application/json" || mediaType.endsWith("+json");',
     );
+  });
+  it('encodes unusual path names and serializes query arrays according to OpenAPI', async () => {
+    const parsed = parseDocument(
+      validateOpenApiDocument({
+        openapi: '3.0.3',
+        info: { title: 'Arrays' },
+        paths: {
+          '/users/{user-id}/${literal}`': {
+            get: {
+              operationId: 'findUser',
+              parameters: [
+                { in: 'path', name: 'user-id', required: true, schema: { type: 'string' } },
+                { in: 'path', name: 'literal', required: true, schema: { type: 'string' } },
+                {
+                  in: 'query',
+                  name: 'tag-name',
+                  schema: { type: 'array', items: { type: 'string' } },
+                },
+                {
+                  in: 'query',
+                  name: 'ids',
+                  explode: false,
+                  schema: { type: 'array', items: { type: 'integer' } },
+                },
+                {
+                  in: 'query',
+                  name: 'pipes',
+                  style: 'pipeDelimited',
+                  schema: { type: 'array', items: { type: 'string' } },
+                },
+              ],
+              responses: { '204': { description: 'Empty' } },
+            },
+          },
+        },
+      }),
+    );
+    const module = await importGeneratedClient(generateClientSource(parsed));
+    const fetchMock = vi.fn(() => Promise.resolve(new Response(null, { status: 204 })));
+    const client = module.createClient({ baseUrl: 'https://example.com/v1', fetch: fetchMock }) as {
+      findUser(request: Record<string, unknown>, init?: RequestInit): Promise<void>;
+    };
+    const signal = new AbortController().signal;
+    await client.findUser(
+      {
+        'user-id': 'a/b',
+        literal: 'safe',
+        'tag-name': ['a b', 'c'],
+        ids: [1, 2],
+        pipes: ['x', 'y'],
+      },
+      { signal },
+    );
+    const [url, init] = (fetchMock.mock.calls as unknown as [URL, RequestInit][])[0];
+    expect(url.pathname).toBe('/v1/users/a%2Fb/$safe%60');
+    expect(url.searchParams.getAll('tag-name')).toEqual(['a b', 'c']);
+    expect(url.searchParams.get('ids')).toBe('1,2');
+    expect(url.searchParams.get('pipes')).toBe('x|y');
+    expect(init.signal).toBe(signal);
+  });
+
+  it('preserves status, headers and raw body when an error response contains invalid JSON', async () => {
+    const module = await importGeneratedClient(
+      generateClientSource(parseDocument(validateOpenApiDocument(fixture))),
+    );
+    const client = module.createClient({
+      fetch: vi.fn(() =>
+        Promise.resolve(
+          new Response('broken json', {
+            status: 429,
+            headers: { 'content-type': 'application/json', 'retry-after': '10' },
+          }),
+        ),
+      ),
+    }) as { getUserById(request: { id: string }): Promise<unknown> };
+    const error = await client.getUserById({ id: '1' }).catch((error: unknown) => error);
+    expect(error).toMatchObject({ name: 'ApiError', status: 429, body: 'broken json' });
+    expect((error as { headers: Headers }).headers.get('retry-after')).toBe('10');
   });
 });

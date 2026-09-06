@@ -40,4 +40,17 @@ describe('normalizeGenerateCommandOptions', () => {
       }),
     ).toThrow('Invalid --url value');
   });
+  it('rejects non-HTTP sources and conflicting preview modes', () => {
+    expect(() =>
+      normalizeGenerateCommandOptions({ output: './generated', url: 'file:///tmp/schema.json' }),
+    ).toThrow('Invalid --url');
+    expect(() =>
+      normalizeGenerateCommandOptions({
+        output: './generated',
+        file: './schema.json',
+        check: true,
+        dryRun: true,
+      }),
+    ).toThrow('Use either --check or --dry-run');
+  });
 });
