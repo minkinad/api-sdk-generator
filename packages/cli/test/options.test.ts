@@ -53,4 +53,14 @@ describe('normalizeGenerateCommandOptions', () => {
       }),
     ).toThrow('Use either --check or --dry-run');
   });
+  it('validates schema download deadlines', () => {
+    const input = { file: './schema.yaml', output: './generated' };
+    expect(normalizeGenerateCommandOptions(input).schemaTimeoutMs).toBe(30000);
+    expect(normalizeGenerateCommandOptions({ ...input, timeout: '5000' }).schemaTimeoutMs).toBe(
+      5000,
+    );
+    for (const timeout of ['0', '-1', 'NaN', 'Infinity', '0.5', '4294967296']) {
+      expect(() => normalizeGenerateCommandOptions({ ...input, timeout })).toThrow('--timeout');
+    }
+  });
 });

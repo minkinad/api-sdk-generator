@@ -26,6 +26,8 @@ export interface GenerateSdkOptions {
   /** Compare generated files with disk without writing them. */
   check?: boolean;
   fetchImplementation?: typeof fetch;
+  signal?: AbortSignal;
+  schemaTimeoutMs?: number;
   logger?: Logger;
 }
 

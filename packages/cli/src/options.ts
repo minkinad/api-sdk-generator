@@ -3,6 +3,7 @@ import path from 'node:path';
 import { CliUsageError } from './errors.js';
 
 export interface GenerateCommandOptionsInput {
+  timeout?: string;
   baseUrl?: string;
   clean?: boolean;
   check?: boolean;
@@ -15,6 +16,7 @@ export interface GenerateCommandOptionsInput {
 }
 
 export interface NormalizedGenerateCommandOptions {
+  schemaTimeoutMs: number;
   baseUrl?: string;
   clean: boolean;
   check: boolean;
@@ -32,6 +34,16 @@ export function normalizeGenerateCommandOptions(
   options: GenerateCommandOptionsInput,
 ): NormalizedGenerateCommandOptions {
   const workingDirectory = process.env.INIT_CWD ?? process.cwd();
+  const schemaTimeoutMs = Number(options.timeout ?? 30_000);
+  if (
+    !Number.isSafeInteger(schemaTimeoutMs) ||
+    schemaTimeoutMs <= 0 ||
+    schemaTimeoutMs > 2_147_483_647
+  ) {
+    throw new CliUsageError(
+      'The --timeout option must be a positive integer no greater than 2147483647 milliseconds.',
+    );
+  }
 
   if (options.check && options.dryRun) {
     throw new CliUsageError('Use either --check or --dry-run, not both.');
@@ -65,6 +77,7 @@ export function normalizeGenerateCommandOptions(
   }
 
   return {
+    schemaTimeoutMs,
     baseUrl: options.baseUrl,
     clean: options.clean ?? false,
     check: options.check ?? false,

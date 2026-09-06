@@ -32,6 +32,7 @@ export async function executeGenerateCommand(
     logger,
     outputDir: options.outputDir,
     sdkName: options.sdkName,
+    schemaTimeoutMs: options.schemaTimeoutMs,
   });
 
   if (options.check) {

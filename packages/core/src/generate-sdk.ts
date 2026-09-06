@@ -1,5 +1,3 @@
-import path from 'node:path';
-
 import { OutputWriteError } from './errors.js';
 import { formatGeneratedFiles } from './formatter.js';
 import { generateClientSource } from './generator/client-generator.js';
@@ -9,6 +7,7 @@ import { generateTypesSource } from './generator/type-generator.js';
 import { loadOpenApiDocument } from './loader.js';
 import { noopLogger } from './logger.js';
 import { parseDocument } from './parser.js';
+import { canonicalPath, isWithinDirectory } from './paths.js';
 import type { GenerateSdkOptions, GenerateSdkResult } from './types.js';
 import { compareGeneratedFiles, writeGeneratedFiles } from './writer.js';
 
@@ -19,11 +18,12 @@ export async function generateSdk(options: GenerateSdkOptions): Promise<Generate
     throw new OutputWriteError('The check and dryRun options cannot be combined.');
   }
   if (options.clean && !options.check && !options.dryRun && options.input.file) {
-    const relative = path.relative(
-      path.resolve(options.outputDir),
-      path.resolve(options.input.file),
-    );
-    if (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative)) {
+    if (
+      isWithinDirectory(
+        await canonicalPath(options.outputDir),
+        await canonicalPath(options.input.file),
+      )
+    ) {
       throw new OutputWriteError('Cannot clean an output directory containing the input schema.');
     }
   }
@@ -32,6 +32,8 @@ export async function generateSdk(options: GenerateSdkOptions): Promise<Generate
   const document = await loadOpenApiDocument(options.input, {
     fetchImplementation: options.fetchImplementation,
     logger,
+    signal: options.signal,
+    timeoutMs: options.schemaTimeoutMs,
   });
 
   logger.info('Parsing OpenAPI document');
