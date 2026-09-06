@@ -13,6 +13,7 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm release:check
 ```
 
 ## Workspace structure
@@ -37,9 +38,10 @@ pnpm changeset
 3. Merge the release PR.
 4. The release workflow publishes to npm and creates GitHub Releases.
 
-## Required repository secrets
+## Publishing setup
 
-- `NPM_TOKEN`: npm automation token with publish access
+- Configure npm trusted publishing for both packages; see [publishing guide](./apps/docs/docs/guide/publishing-npm.md).
+- The release workflow uses OIDC; no `NPM_TOKEN` is required.
 
 ## Documentation deployment
 

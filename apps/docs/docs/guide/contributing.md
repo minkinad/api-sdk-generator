@@ -8,6 +8,7 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm release:check
 ```
 
 ## Changesets
@@ -20,7 +21,7 @@ pnpm changeset
 
 ## Secrets and infrastructure
 
-- `NPM_TOKEN` is required for npm publishing
+- Configure npm trusted publishing for both packages; see [publishing guide](./publishing-npm.md).
 - GitHub Pages must be enabled for docs deployment
 - GitHub Packages publishing uses `GITHUB_TOKEN`
 
