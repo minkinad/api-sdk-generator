@@ -1,7 +1,7 @@
 # api-sdk-generator
 
 Generate TypeScript fetch SDKs from OpenAPI JSON or YAML schemas.
-Requires Node.js 20 or later.
+Requires Node.js 20.19 or later.
 
 ```bash
 npx api-sdk-generator generate --file ./openapi.yaml --output ./generated
@@ -20,6 +20,7 @@ Options:
 - `--dry-run`: validate and preview without writing.
 - `--check`: verify generated files; exit code 2 means missing or outdated files.
 - `--clean`: remove the output directory before generation.
+- `--timeout <ms>`: schema download timeout, default `30000`.
 - `--verbose`: diagnostic logs.
 
 ```ts

@@ -1,33 +1,52 @@
 # GitHub Actions Release Flow
 
-## Workflows
+## Checks
 
-- `ci.yml`: lint, typecheck, test, build and install npm archives on Node.js 20 and 24.
-- `release.yml`: Changesets release PRs, npm trusted publishing and GitHub releases.
-- `docs.yml`: GitHub Pages deployment.
-- `package-github.yml`: optional scoped core publication to GitHub Packages.
+`ci.yml` is reusable and runs on pull requests, main pushes, manual dispatch and a
+weekly schedule. Release publication depends on its successful completion.
+
+- Quality: formatting, ESLint, workspace types and release-script tests.
+- Tests: Node.js 20.19, 22 and 24 on Linux, plus Node.js 24 on macOS; coverage is uploaded.
+- Packages: build packages/docs/demo, verify committed demo output, install archives,
+  exercise ESM/CJS and CLI behavior, and dry-run npm publishing.
+- Workflows: actionlint validates workflow expressions, permissions and syntax.
+- Dependencies: high and critical audit findings fail the job.
+
+`docs.yml` builds pull requests with read-only permissions and deploys only main.
+Pages permissions belong only to its deploy job. Shared setup lives in
+`.github/actions/setup/action.yml`; third-party actions are pinned to commit SHAs.
+Dependabot maintains those pins and groups related dependency updates.
 
 ## First release
 
-Follow the [npm publishing guide](./publishing-npm.md) to publish both packages
-manually and configure an npm trusted publisher for each package. The release
-workflow uses Node.js 24 and npm 11 with OIDC; it does not require `NPM_TOKEN`.
+Use the [npm guide](./publishing-npm.md) to publish both packages manually and add
+an npm trusted publisher for each package. The workflow uses Node.js 24 and npm 11
+with OIDC. It does not require `NPM_TOKEN`.
 
-Enable `Allow GitHub Actions to create and approve pull requests` under
-`Settings → Actions → General → Workflow permissions`. Organization policies
-must also allow this setting.
+Enable GitHub Actions pull-request creation and GitHub Pages in repository settings.
+The repository must be public for npm provenance.
 
-## Release process
+## Version and publish
 
-1. Add a changeset and merge the change into `main`.
-2. The workflow opens or updates a PR containing new versions and changelogs.
-3. Merge the release PR.
-4. The workflow validates archives and publishes previously unpublished versions,
-   core before CLI. It creates tags and GitHub Releases for newly published packages.
+1. Add changesets with user-facing changes and merge into `main`.
+2. After checks pass, Changesets opens a PR containing versions and changelogs.
+3. Merge that PR. The next release run checks the exact source commit before publishing.
+4. `pnpm release` packs with pnpm, publishes with npm, and tags each successful publication.
+5. `pnpm release:github` creates missing GitHub Releases from package changelogs and existing tags.
+6. A reusable GitHub Packages job publishes the scoped core package, skipping existing versions.
 
-`pnpm release` packs with pnpm to resolve workspace dependencies, then invokes
-npm directly for OIDC support. The script skips existing registry versions and
-stops on publication, authentication or network failures. Prereleases use the
-`next` dist-tag. Releases are serialized, and manual dispatch is limited to `main`.
+The GitHub Packages workflow is called explicitly: GitHub release events produced
+by the workflow token must not be the only way to start that publication.
+It also supports manual dispatch and releases created interactively.
 
-Run `pnpm release:check` locally to test archives without publishing.
+## Recovery
+
+- A pending changeset or dirty working tree stops real publication. `--dry-run` remains available.
+- Existing npm versions are skipped. Network/authentication errors stop the process; only registry E404 means unpublished.
+- If core succeeds and CLI fails, fix the cause and rerun the same release.
+- Existing GitHub releases are skipped. If GitHub release creation fails after npm succeeds, rerun `pnpm release:github` with `GH_TOKEN` or `GITHUB_TOKEN` after pushing the commits/tags.
+- A tag that points to another commit is never moved. If publication succeeded immediately before a tag-writing failure, inspect the published source and restore the correct tag manually.
+- Prerelease versions publish with the `next` npm dist-tag.
+
+Concurrent releases are serialized. A manual release dispatch must target `main`.
+`pnpm release:check` verifies archives without publishing; `pnpm verify` runs the local checks.

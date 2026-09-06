@@ -19,6 +19,8 @@
 - `clean`
 - `dryRun`: return formatted files without writing
 - `check`: compare against disk; inspect `result.changedFiles`
+- `schemaTimeoutMs` (core) / `--timeout` (CLI): remote schema deadline, default 30 seconds
+- `signal` (core): cancel schema downloads
 - `logger` (core) / `--verbose` (CLI)
 
 ## Supported OpenAPI features
@@ -64,4 +66,8 @@ numeric suffix (for example `CreateUserRequest2`). Components keep their names.
 
 `--clean` removes the output directory: use a dedicated generated directory.
 It rejects the working directory, its ancestors, the home directory and directories
-containing the local input schema. `--check` and `--dry-run` perform no writes.
+containing the local input schema, resolving existing ancestor symlinks when checking
+protected paths. Output-root and nested symlinks are rejected. Files are replaced
+atomically; the directory as a whole is not a transaction. Cyclic YAML aliases are
+rejected; use OpenAPI `$ref` for recursive models.
+`--check` and `--dry-run` perform no writes.
