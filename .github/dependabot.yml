@@ -4,9 +4,23 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    groups:
+      typescript-eslint:
+        patterns: ['typescript-eslint', '@typescript-eslint/*']
+      testing:
+        patterns: ['vitest', '@vitest/*']
+      documentation:
+        patterns: ['vitepress', 'vue', 'search-insights']
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci(deps)
+    groups:
+      actions:
+        patterns: ['*']
