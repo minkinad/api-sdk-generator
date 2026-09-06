@@ -1,6 +1,6 @@
 {
   "name": "api-sdk-generator",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "CLI for generating TypeScript SDK clients from OpenAPI 3.x schemas.",
   "type": "module",
   "bin": {
