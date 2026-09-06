@@ -1,5 +1,22 @@
 # api-sdk-generator
 
+## 0.3.0
+
+### Minor Changes
+
+- [`060e503`](https://github.com/minkinad/api-sdk-generator/commit/060e50370cafa84a776ac14bf030de16b4053089) Thanks [@minkinad](https://github.com/minkinad)! - Add YAML input, dry-run generation and CI drift checks. Support query arrays,
+  HEAD/OPTIONS and anyOf; fix dictionary/nullable/composed types, parameter access,
+  component references and generated type collisions. Preserve HTTP error metadata
+  and use NodeNext-compatible imports. Prepare complete npm archives and validate
+  them in an isolated consumer; support manual publishing and CI trusted publishing.
+
+### Patch Changes
+
+- [`ddbb7b3`](https://github.com/minkinad/api-sdk-generator/commit/ddbb7b389ecb03a5ca0b496a6a672effb9a02711) Thanks [@minkinad](https://github.com/minkinad)! - Harden generated clients by preserving base URL paths, honoring JSON media types, and safely parsing empty responses. Generated output paths are now contained within the target directory, formatting is deterministic, and the CLI reports its package version without duplicated metadata.
+
+- Updated dependencies [[`ddbb7b3`](https://github.com/minkinad/api-sdk-generator/commit/ddbb7b389ecb03a5ca0b496a6a672effb9a02711), [`060e503`](https://github.com/minkinad/api-sdk-generator/commit/060e50370cafa84a776ac14bf030de16b4053089)]:
+  - @minkinad/api-sdk-generator-core@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes
