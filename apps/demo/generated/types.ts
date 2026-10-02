@@ -17,10 +17,6 @@ export interface User {
 }
 export type UserStatus = 'active' | 'disabled';
 
-export interface GetUserByIdRequest {
-  id: string;
-}
-export type GetUserByIdResponse = User;
 export interface GetUsersRequest {
   page?: number;
   status?: UserStatus;
@@ -30,3 +26,7 @@ export interface CreateUserRequest2 {
   body: CreateUserRequest;
 }
 export type CreateUserResponse = User;
+export interface GetUserByIdRequest {
+  id: string;
+}
+export type GetUserByIdResponse = User;

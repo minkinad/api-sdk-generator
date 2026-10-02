@@ -5,12 +5,12 @@
  */
 
 import type {
-  GetUserByIdRequest,
-  GetUserByIdResponse,
   GetUsersRequest,
   GetUsersResponse,
   CreateUserRequest2,
   CreateUserResponse,
+  GetUserByIdRequest,
+  GetUserByIdResponse,
 } from './types.js';
 
 export interface ClientConfig {
@@ -20,9 +20,9 @@ export interface ClientConfig {
 }
 
 export interface DemoSdkClient {
-  getUserById(request: GetUserByIdRequest, init?: RequestInit): Promise<GetUserByIdResponse>;
   getUsers(request?: GetUsersRequest, init?: RequestInit): Promise<GetUsersResponse>;
   createUser(request: CreateUserRequest2, init?: RequestInit): Promise<CreateUserResponse>;
+  getUserById(request: GetUserByIdRequest, init?: RequestInit): Promise<GetUserByIdResponse>;
 }
 
 export class ApiError extends Error {
@@ -61,70 +61,75 @@ export function createClient(config: ClientConfig = {}): DemoSdkClient {
     throw new Error('Fetch API is not available in the current runtime.');
   }
 
+  async function sendRequest<T>(
+    url: URL,
+    method: string,
+    body: BodyInit | undefined,
+    contentType: string | undefined,
+    responseContentTypes: Record<string, string>,
+    fallbackContentType: string,
+    init?: RequestInit,
+  ): Promise<T> {
+    const headers = new Headers(config.headers);
+    if (body !== undefined && contentType && !headers.has('content-type')) {
+      headers.set('content-type', contentType);
+    }
+    const response = await runtimeFetch(url, {
+      ...init,
+      method,
+      body,
+      headers: mergeHeaders(headers, init?.headers),
+    });
+    if (!response.ok) throw await ApiError.fromResponse(response);
+    return parseResponse<T>(
+      response,
+      responseContentTypes[String(response.status)] ?? fallbackContentType,
+    );
+  }
+
   return {
-    async getUserById(request, init?: RequestInit): Promise<GetUserByIdResponse> {
-      const url = resolveRequestUrl(
-        resolveBaseUrl(config.baseUrl),
-        '/users/' + encodeURIComponent(String(request['id'])) + '',
-      );
-      const searchParams = url.searchParams;
-      void searchParams;
-      const headers = new Headers(config.headers);
-      const body = undefined;
-      const response = await runtimeFetch(url, {
-        ...init,
-        method: 'GET',
-        body,
-        headers: mergeHeaders(headers, init?.headers),
-      });
-
-      if (!response.ok) {
-        throw await ApiError.fromResponse(response);
-      }
-
-      return parseResponse<GetUserByIdResponse>(response);
-    },
     async getUsers(request = {}, init?: RequestInit): Promise<GetUsersResponse> {
       const url = resolveRequestUrl(resolveBaseUrl(config.baseUrl), '/users');
       const searchParams = url.searchParams;
       appendQueryParameter(searchParams, 'page', request['page'], true, ',');
       appendQueryParameter(searchParams, 'status', request['status'], true, ',');
-      const headers = new Headers(config.headers);
-      const body = undefined;
-      const response = await runtimeFetch(url, {
-        ...init,
-        method: 'GET',
-        body,
-        headers: mergeHeaders(headers, init?.headers),
-      });
-
-      if (!response.ok) {
-        throw await ApiError.fromResponse(response);
-      }
-
-      return parseResponse<GetUsersResponse>(response);
+      return sendRequest<GetUsersResponse>(
+        url,
+        'GET',
+        undefined,
+        undefined,
+        { '200': 'application/json' },
+        'application/json',
+        init,
+      );
     },
     async createUser(request, init?: RequestInit): Promise<CreateUserResponse> {
       const url = resolveRequestUrl(resolveBaseUrl(config.baseUrl), '/users');
-      const searchParams = url.searchParams;
-      void searchParams;
-      const headers = new Headers(config.headers);
       const body = request.body !== undefined ? JSON.stringify(request.body) : undefined;
-      if (body !== undefined && !headers.has('content-type')) {
-        headers.set('content-type', 'application/json');
-      }
-      const response = await runtimeFetch(url, {
-        ...init,
-        method: 'POST',
+      return sendRequest<CreateUserResponse>(
+        url,
+        'POST',
         body,
-        headers: mergeHeaders(headers, init?.headers),
-      });
-
-      if (!response.ok) {
-        throw await ApiError.fromResponse(response);
-      }
-
-      return parseResponse<CreateUserResponse>(response);
+        'application/json',
+        { '201': 'application/json' },
+        'application/json',
+        init,
+      );
+    },
+    async getUserById(request, init?: RequestInit): Promise<GetUserByIdResponse> {
+      const url = resolveRequestUrl(
+        resolveBaseUrl(config.baseUrl),
+        '/users/' + encodeURIComponent(String(request['id'])),
+      );
+      return sendRequest<GetUserByIdResponse>(
+        url,
+        'GET',
+        undefined,
+        undefined,
+        { '200': 'application/json' },
+        'application/json',
+        init,
+      );
     },
   };
 }
@@ -138,22 +143,25 @@ function resolveRequestUrl(baseUrl: string, requestPath: string): URL {
   return new URL(requestPath.replace(/^\/+/, ''), normalizedBaseUrl);
 }
 
-async function parseResponse<T>(response: Response): Promise<T> {
-  return (await parseResponseBody(response)) as T;
+async function parseResponse<T>(response: Response, expectedContentType: string): Promise<T> {
+  return (await parseResponseBody(response, expectedContentType)) as T;
 }
 
-async function parseResponseBody(response: Response): Promise<unknown> {
+async function parseResponseBody(response: Response, expectedContentType = ''): Promise<unknown> {
   if (response.status === 204 || response.status === 205) {
     return undefined;
   }
 
+  const contentType = response.headers.get('content-type') ?? expectedContentType;
+  if (contentType.split(';', 1)[0].trim().toLowerCase() === 'application/octet-stream') {
+    return response.arrayBuffer();
+  }
   const body = await response.text();
 
   if (!body) {
     return undefined;
   }
 
-  const contentType = response.headers.get('content-type') ?? '';
   return isJsonContentType(contentType) ? (JSON.parse(body) as unknown) : body;
 }
 
@@ -169,12 +177,19 @@ function appendQueryParameter(
   explode: boolean,
   separator: string,
 ): void {
-  if (value === undefined) return;
+  if (value === undefined || value === null) return;
   if (Array.isArray(value)) {
     if (explode) {
-      for (const item of value) params.append(name, String(item));
+      for (const item of value)
+        if (item !== undefined && item !== null) params.append(name, String(item));
     } else {
-      params.set(name, value.map(String).join(separator));
+      params.set(
+        name,
+        value
+          .filter((item) => item !== undefined && item !== null)
+          .map(String)
+          .join(separator),
+      );
     }
   } else {
     params.set(name, String(value));
