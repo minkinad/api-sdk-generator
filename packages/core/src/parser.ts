@@ -42,6 +42,9 @@ function dereferenceParameter(
   document: OpenApiDocument,
   parameter: OpenAPIV3.ReferenceObject | OpenAPIV3.ParameterObject,
 ): OpenAPIV3.ParameterObject {
+  if (!parameter || typeof parameter !== 'object') {
+    throw new SchemaValidationError('Invalid parameter: expected an object.');
+  }
   if (!('$ref' in parameter)) {
     return parameter;
   }
@@ -55,8 +58,16 @@ function extractParameters(
 ): ParsedParameter[] {
   return (parameters ?? [])
     .map((parameter) => dereferenceParameter(document, parameter))
-    .filter((parameter) => parameter.in === 'path' || parameter.in === 'query')
+    .filter((parameter) => {
+      if (parameter.in !== 'path' && parameter.in !== 'query') {
+        throw new UnsupportedSchemaError(
+          `Unsupported ${parameter.in} parameter "${parameter.name}". Only path and query parameters are supported.`,
+        );
+      }
+      return true;
+    })
     .map((parameter) => ({
+      allowReserved: parameter.allowReserved,
       description: parameter.description,
       explode: parameter.explode,
       style: parameter.style,
@@ -116,6 +127,11 @@ function extractRequestBody(
     throw new UnsupportedSchemaError('Only JSON request bodies are supported.');
   }
 
+  if (!jsonContent.value || typeof jsonContent.value !== 'object') {
+    throw new SchemaValidationError(
+      `Invalid ${jsonContent.contentType} request body: expected an object.`,
+    );
+  }
   const schema = jsonContent.value.schema;
 
   if (!schema) {
@@ -136,26 +152,25 @@ function resolveRequestBody(
   return resolveLocalComponent(requestBody, document.components?.requestBodies, 'requestBodies');
 }
 
-function extractResponse(operation: OpenAPIV3.OperationObject): {
+function extractResponses(operation: OpenAPIV3.OperationObject): Array<{
   response: OpenAPIV3.ReferenceObject | OpenAPIV3.ResponseObject;
   statusCode: string;
-} {
+}> {
   const entries = Object.entries(operation.responses ?? {});
-  const successfulEntry = entries.find(([status]) => /^2(?:\d\d|XX)$/i.test(status)) ?? entries[0];
-
-  if (!successfulEntry) {
-    return {
-      response: {
-        description: 'No content',
-      },
-      statusCode: '204',
-    };
+  const successfulEntries = entries.filter(([status]) => /^2(?:\d\d|XX)$/i.test(status));
+  if (successfulEntries.length === 0) {
+    const fallback = entries.find(([status]) => status === 'default');
+    if (fallback) successfulEntries.push(fallback);
   }
 
-  return {
-    response: successfulEntry[1],
-    statusCode: successfulEntry[0],
-  };
+  if (successfulEntries.length === 0) {
+    throw new SchemaValidationError(
+      'Operation must declare a successful response (2xx or default).',
+    );
+  }
+  return successfulEntries
+    .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+    .map(([statusCode, response]) => ({ response, statusCode }));
 }
 
 function resolveResponse(
@@ -171,16 +186,56 @@ function resolveResponse(
 
 function parseResponse(
   document: OpenApiDocument,
-  operation: OpenAPIV3.OperationObject,
+  response: OpenAPIV3.ReferenceObject | OpenAPIV3.ResponseObject,
+  statusCode: string,
 ): ParsedResponse {
-  const { response, statusCode } = extractResponse(operation);
   const resolved = resolveResponse(document, response);
+  if (Object.keys(resolved.content ?? {}).length > 1) {
+    throw new UnsupportedSchemaError(
+      `Multiple response media types for status ${statusCode} are unsupported.`,
+    );
+  }
   const jsonContent = getJsonContent(resolved);
 
+  if (jsonContent) {
+    if (!jsonContent.value || typeof jsonContent.value !== 'object') {
+      throw new SchemaValidationError(
+        `Invalid ${jsonContent.contentType} response: expected an object.`,
+      );
+    }
+    return {
+      contentType: jsonContent.contentType,
+      description: resolved.description,
+      schema: jsonContent.value.schema,
+      statusCode,
+    };
+  }
+
+  const content = resolved.content ?? {};
+  if (content['text/plain']) {
+    return {
+      contentType: 'text/plain',
+      description: resolved.description,
+      schema: { type: 'string' },
+      statusCode,
+    };
+  }
+  if (content['application/octet-stream']) {
+    return {
+      binary: true,
+      contentType: 'application/octet-stream',
+      description: resolved.description,
+      statusCode,
+    };
+  }
+  if (Object.keys(content).length > 0) {
+    throw new UnsupportedSchemaError(
+      `Unsupported response content type for status ${statusCode}: ${Object.keys(content).join(', ')}.`,
+    );
+  }
+
   return {
-    contentType: jsonContent?.contentType,
     description: resolved.description,
-    schema: jsonContent?.value.schema,
     statusCode,
   };
 }
@@ -206,15 +261,21 @@ export function parseDocument(
     'ApiError',
     `${deriveSdkName(options.sdkName ?? document.info.title)}Client`,
   ]);
-  for (const name of Object.keys(document.components?.schemas ?? {})) {
-    const typeName = toTypeName(name);
-    if (typeNames.has(typeName)) {
-      throw new SchemaValidationError(`Duplicate or reserved generated type name "${typeName}".`);
-    }
-    typeNames.add(typeName);
+  const allocateName = (used: Set<string>, base: string): string => {
+    let name = base;
+    let suffix = 2;
+    while (used.has(name)) name = `${base}${suffix++}`;
+    used.add(name);
+    return name;
+  };
+  const componentTypeNames: Record<string, string> = Object.create(null) as Record<string, string>;
+  for (const name of Object.keys(document.components?.schemas ?? {}).sort()) {
+    componentTypeNames[name] = allocateName(typeNames, toTypeName(name));
   }
 
-  for (const [pathKey, pathItem] of Object.entries(document.paths ?? {})) {
+  for (const [pathKey, pathItem] of Object.entries(document.paths ?? {}).sort(([left], [right]) =>
+    left < right ? -1 : left > right ? 1 : 0,
+  )) {
     if (!pathItem || '$ref' in pathItem) {
       throw new UnsupportedSchemaError(`Path-level $ref is not supported for path "${pathKey}".`);
     }
@@ -229,30 +290,22 @@ export function parseDocument(
         continue;
       }
 
-      const functionName = createFunctionName(method, pathKey, operation.operationId);
-
-      if (functionNames.has(functionName)) {
-        throw new SchemaValidationError(
-          `Duplicate generated operation name "${functionName}". Use unique operationId values.`,
-        );
-      }
-      functionNames.add(functionName);
-      const allocateTypeName = (base: string): string => {
-        let name = base;
-        let suffix = 2;
-        while (typeNames.has(name)) name = `${base}${suffix++}`;
-        typeNames.add(name);
-        return name;
-      };
-      const requestTypeName = allocateTypeName(`${toTypeName(functionName)}Request`);
-      const responseTypeName = allocateTypeName(`${toTypeName(functionName)}Response`);
+      const functionName = allocateName(
+        functionNames,
+        createFunctionName(method, pathKey, operation.operationId),
+      );
+      const requestTypeName = allocateName(typeNames, `${toTypeName(functionName)}Request`);
+      const responseTypeName = allocateName(typeNames, `${toTypeName(functionName)}Response`);
       const mergedParameters = mergeParameters(document, pathItem.parameters, operation.parameters);
       const queryParameters = mergedParameters.filter((parameter) => parameter.in === 'query');
       const extractedPathParameters = mergedParameters.filter(
         (parameter) => parameter.in === 'path',
       );
       const requestBody = extractRequestBody(document, operation.requestBody);
-      const response = parseResponse(document, operation);
+      const responses = extractResponses(operation).map(({ response, statusCode }) =>
+        parseResponse(document, response, statusCode),
+      );
+      const response = responses[0];
       const requestNames = new Set<string>();
       for (const parameter of mergedParameters) {
         if (requestNames.has(parameter.name) || (parameter.name === 'body' && requestBody)) {
@@ -265,12 +318,27 @@ export function parseDocument(
           const schema = resolveSchema(document, parameter.schema);
           const style = parameter.style ?? 'form';
           if (
+            parameter.allowReserved ||
+            (style !== 'form' && parameter.explode === true) ||
             schema.type === 'object' ||
             schema.properties ||
             !['form', 'spaceDelimited', 'pipeDelimited'].includes(style)
           ) {
             throw new UnsupportedSchemaError(
               `Unsupported query serialization for "${parameter.name}": ${style}.`,
+            );
+          }
+        } else {
+          const schema = resolveSchema(document, parameter.schema);
+          if (
+            (parameter.style && parameter.style !== 'simple') ||
+            parameter.explode === true ||
+            schema.type === 'array' ||
+            schema.type === 'object' ||
+            schema.properties
+          ) {
+            throw new UnsupportedSchemaError(
+              `Unsupported path serialization for "${parameter.name}". Only simple primitive path values are supported.`,
             );
           }
         }
@@ -298,6 +366,7 @@ export function parseDocument(
         requestBody,
         requestTypeName,
         response,
+        responses,
         responseTypeName,
         summary: operation.summary,
       });
@@ -309,6 +378,7 @@ export function parseDocument(
 
   return {
     componentSchemas: document.components?.schemas ?? {},
+    componentTypeNames,
     defaultBaseUrl,
     document,
     operations,

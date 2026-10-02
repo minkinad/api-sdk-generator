@@ -4,6 +4,12 @@ import { SchemaValidationError } from './errors.js';
 import type { OpenApiDocument, SchemaLike } from './types.js';
 
 export function isReferenceObject(schema: SchemaLike): schema is OpenAPIV3.ReferenceObject {
+  if (typeof schema !== 'object' || schema === null) {
+    throw new SchemaValidationError('Invalid schema: expected an object or local $ref.');
+  }
+  if ('$ref' in schema && typeof schema.$ref !== 'string') {
+    throw new SchemaValidationError('Invalid reference: $ref must be a string.');
+  }
   return '$ref' in schema;
 }
 
@@ -48,6 +54,9 @@ export function resolveLocalComponent<T extends object>(
   let current = reference;
   const prefix = `#/components/${section}/`;
   for (;;) {
+    if (typeof current.$ref !== 'string') {
+      throw new SchemaValidationError('Invalid reference: $ref must be a string.');
+    }
     if (!current.$ref.startsWith(prefix)) {
       throw new SchemaValidationError(
         `Only local ${section} refs are supported. Received "${current.$ref}".`,

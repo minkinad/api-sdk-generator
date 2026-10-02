@@ -46,6 +46,7 @@ export interface GenerateSdkResult {
 }
 
 export interface ParsedParameter {
+  allowReserved?: boolean;
   explode?: boolean;
   style?: string;
   description?: string;
@@ -62,6 +63,7 @@ export interface ParsedRequestBody {
 }
 
 export interface ParsedResponse {
+  binary?: boolean;
   contentType?: string;
   description?: string;
   schema?: SchemaLike;
@@ -81,12 +83,14 @@ export interface ParsedOperation {
   requestBody?: ParsedRequestBody;
   requestTypeName: string;
   response: ParsedResponse;
+  responses?: ParsedResponse[];
   responseTypeName: string;
   summary?: string;
 }
 
 export interface ParsedDocument {
   componentSchemas: Record<string, SchemaLike>;
+  componentTypeNames?: Record<string, string>;
   defaultBaseUrl?: string;
   document: OpenApiDocument;
   operations: ParsedOperation[];
