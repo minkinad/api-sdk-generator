@@ -4,7 +4,6 @@
 
 ### Minor Changes
 
-
 - 060e503: Add YAML input, dry-run generation and CI drift checks. Support query arrays,
 
   HEAD/OPTIONS and anyOf; fix dictionary/nullable/composed types, parameter access,
