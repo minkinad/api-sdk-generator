@@ -2,8 +2,9 @@
 
 ## Checks
 
-`ci.yml` is reusable and runs on pull requests, main pushes, manual dispatch and a
-weekly schedule. Release publication depends on its successful completion.
+`ci.yml` is reusable and runs on pull requests, manual dispatch and a weekly
+schedule. On main pushes, `release.yml` invokes it before release work; there is
+no second direct CI run for the same push.
 
 - Quality: formatting, ESLint, workspace types and release-script tests.
 - Tests: Node.js 20.19, 22 and 24 on Linux, plus Node.js 24 on macOS; coverage is uploaded.
