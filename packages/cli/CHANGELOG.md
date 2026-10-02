@@ -4,11 +4,14 @@
 
 ### Minor Changes
 
+
 - 060e503: Add YAML input, dry-run generation and CI drift checks. Support query arrays,
+
   HEAD/OPTIONS and anyOf; fix dictionary/nullable/composed types, parameter access,
   component references and generated type collisions. Preserve HTTP error metadata
   and use NodeNext-compatible imports. Prepare complete npm archives and validate
   them in an isolated consumer; support manual publishing and CI trusted publishing.
+
 - e4943a4: Add configurable schema download deadlines and cancellation, reject cyclic YAML
   aliases, validate output paths through symlinks, and replace generated files
   atomically. Require Node.js 20.19 or later. Harden release retries, package checks
@@ -21,6 +24,7 @@
 - Updated dependencies [ddbb7b3]
 - Updated dependencies [060e503]
 - Updated dependencies [e4943a4]
+
   - @minkinad/api-sdk-generator-core@0.3.0
 
 ## 0.2.0
