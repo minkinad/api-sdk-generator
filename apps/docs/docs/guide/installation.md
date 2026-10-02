@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Node.js `>= 20`
+- Node.js `>= 20.19.0`
 - `pnpm`
 
 ## Local development

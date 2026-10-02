@@ -1,168 +1,197 @@
 # API SDK Generator
 
 [![CI](https://img.shields.io/github/actions/workflow/status/minkinad/api-sdk-generator/ci.yml?branch=main)](https://github.com/minkinad/api-sdk-generator/actions/workflows/ci.yml)
-[![npm version](https://img.shields.io/npm/v/api-sdk-generator)](https://www.npmjs.com/package/api-sdk-generator)
-[![GitHub Release](https://img.shields.io/github/v/release/minkinad/api-sdk-generator)](https://github.com/minkinad/api-sdk-generator/releases)
-[![Docs](https://img.shields.io/badge/docs-github%20pages-blue)](https://minkinad.github.io/api-sdk-generator/)
-[![License](https://img.shields.io/github/license/minkinad/api-sdk-generator)](./LICENSE)
+[![npm](https://img.shields.io/npm/v/api-sdk-generator)](https://www.npmjs.com/package/api-sdk-generator)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![Documentation](https://img.shields.io/badge/docs-online-blue)](https://minkinad.github.io/api-sdk-generator/)
 
-Generate TypeScript SDK clients from OpenAPI JSON or YAML schemas. The project ships a reusable core generator, a CLI package that works with `npx`, docs on GitHub Pages, a demo app, and production-style GitHub automation for CI and releases.
+**Generate a typed TypeScript fetch client from an OpenAPI JSON or YAML document.**
+Run it from the command line or call the reusable core from a build script. The
+output is ordinary TypeScript you can inspect, commit, and compile with your application.
 
-## Installation
-
-```bash
-npm install --save-dev api-sdk-generator
-```
-
-or run it directly:
-
-```bash
-npx api-sdk-generator generate --url https://api.example.com/openapi.json --output ./generated
-```
+[Quick start](#quick-start) · [CLI reference](#cli-reference) · [Supported schemas](#supported-schemas) · [Contributing](./CONTRIBUTING.md) · [Публикация в npm](./apps/docs/docs/guide/publishing-npm.md)
 
 ## Quick start
 
-Generate from a local file:
+Requires **Node.js 20.19+** to run the generator. Node.js 24 is recommended for development
+and publishing. Generated clients use the standard Fetch API and need a fetch-capable runtime.
 
 ```bash
-npx api-sdk-generator generate --file ./openapi.json --output ./generated
+npm install --save-dev api-sdk-generator
+npx api-sdk-generator generate --file ./openapi.yaml --output ./generated
 ```
 
-Generate from a URL:
+For an API with `operationId: getUserById` and path parameter `id`:
 
-```bash
-npx api-sdk-generator generate --url https://api.example.com/openapi.json --output ./generated
+```ts
+import { ApiError, createClient } from './generated/index.js';
+
+const client = createClient({
+  baseUrl: 'https://api.example.com/v1',
+  headers: { Authorization: 'Bearer token' },
+});
+
+try {
+  const user = await client.getUserById({ id: '123' });
+  console.log(user);
+} catch (error) {
+  if (error instanceof ApiError) {
+    console.error(error.status, error.body);
+    console.log(error.headers.get('retry-after'));
+  } else {
+    throw error;
+  }
+}
 ```
 
-Workspace example:
+Method and type names come from your schema. See the working
+[demo](./apps/demo/example.ts) and [OpenAPI example](./apps/demo/openapi.json).
 
-```bash
-pnpm --filter api-sdk-generator generate --file apps/demo/openapi.json --output apps/demo/generated
-```
+## What gets generated?
 
-## CLI examples
+| File        | Contents                                                     |
+| ----------- | ------------------------------------------------------------ |
+| `types.ts`  | Component models and operation request/response types        |
+| `client.ts` | `createClient`, client configuration, methods and `ApiError` |
+| `index.ts`  | Public exports with NodeNext-compatible import paths         |
+| `README.md` | Usage example for the generated client                       |
+
+The generated SDK has no dependency on this generator. It uses standard
+`fetch`, `Headers`, `URL`, and `URLSearchParams`; provide `config.fetch` when needed.
+Types describe the API contract; they do not validate server responses at runtime.
+
+## CLI reference
 
 ```bash
 api-sdk-generator generate \
-  --file ./openapi.json \
+  --url https://api.example.com/openapi.yaml \
   --output ./generated \
   --name ExampleSdk \
-  --base-url https://api.example.com \
-  --clean \
-  --verbose
+  --timeout 30000
 ```
 
-Supported options:
+| Option             | Behavior                                                               |
+| ------------------ | ---------------------------------------------------------------------- |
+| `--file <path>`    | Read a local JSON or YAML schema                                       |
+| `--url <url>`      | Download a schema over HTTP(S); choose exactly one of file/URL         |
+| `--output <path>`  | Required output directory                                              |
+| `--name <name>`    | Override the name derived from `info.title`                            |
+| `--base-url <url>` | Override the API server URL                                            |
+| `--timeout <ms>`   | Schema download deadline, including the response body; default `30000` |
+| `--dry-run`        | Validate and format output without writing files                       |
+| `--check`          | Check existing generated files without modifying them                  |
+| `--clean`          | Delete the output directory before writing; use a dedicated directory  |
+| `--verbose`        | Print diagnostic logs                                                  |
 
-- `--url <url>`
-- `--file <path>`
-- `--output <path>`
-- `--name <sdkName>`
-- `--base-url <baseUrl>`
-- `--dry-run` (preview without writing)
-- `--check` (exit code 2 when generated files are outdated)
-- `--clean`
-- `--verbose`
+Exit codes: `0` success, `1` invalid input or generation failure, `2` outdated or
+missing files in `--check` mode. `--check` and `--dry-run` are mutually exclusive.
+Both modes leave existing files untouched, including when `--clean` is present.
 
-## Features
+### Keep an SDK in sync in CI
 
-- JSON and YAML from local files or HTTP(S) URLs.
-- Typed fetch clients, JSON request bodies, path parameters and query arrays.
-- `anyOf`, `oneOf`, `allOf`, nullable objects, dictionaries and recursive component models.
-- GET, POST, PUT, PATCH, DELETE, HEAD and OPTIONS.
-- Safe parameter access for names such as `user-id`; escaped path values.
-- `ApiError` exposes HTTP status, headers and body, including malformed JSON errors.
-- Generated imports work with TypeScript NodeNext and bundlers.
-- `--dry-run` previews generation; `--check` detects SDK drift in CI without changing files.
+Commit generated files and check them using the same input and options:
+
+```json
+{
+  "scripts": {
+    "sdk:generate": "api-sdk-generator generate --file openapi.yaml --output src/generated",
+    "sdk:check": "api-sdk-generator generate --file openapi.yaml --output src/generated --check"
+  }
+}
+```
+
+Use a local or versioned schema in CI for reproducible output. `--check` compares
+the four generated files and ignores unrelated files.
+
+## Programmatic generation
 
 ```bash
-api-sdk-generator generate --file ./openapi.yaml --output ./generated --check
+npm install @minkinad/api-sdk-generator-core
 ```
-
-The generator supports a subset of OpenAPI, primarily the 3.0 schema model.
-See [supported features and limitations](./apps/docs/docs/guide/configuration.md).
-
-## Generated SDK example
 
 ```ts
-import { createClient } from './generated';
+import { generateSdk } from '@minkinad/api-sdk-generator-core';
 
-const client = createClient({
-  baseUrl: 'https://api.example.com',
-  headers: {
-    Authorization: 'Bearer token',
-  },
+const result = await generateSdk({
+  input: { file: './openapi.yaml' },
+  outputDir: './generated',
+  dryRun: true,
 });
 
-const user = await client.getUserById({ id: '123' });
+console.log(
+  result.operations,
+  result.files.map((file) => file.path),
+);
 ```
 
-## Development
+Use `check: true` and inspect `result.changedFiles` to detect drift. Remote input
+supports `schemaTimeoutMs`, an `AbortSignal` through `signal`, and a custom
+`fetchImplementation`. The core and CLI library exports support ESM and CommonJS.
 
-```bash
-pnpm install
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm build
-pnpm release:check
-```
+## Supported schemas
 
-Key workspaces:
+The generator implements a documented **subset of OpenAPI**, based on the 3.0 schema model.
 
-- `packages/core`: generator engine
-- `packages/cli`: CLI package published as `api-sdk-generator`
-- `apps/docs`: VitePress documentation
-- `apps/demo`: sample OpenAPI schema and generated SDK usage
+| Supported    | Details                                                                           |
+| ------------ | --------------------------------------------------------------------------------- |
+| Operations   | GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS                                      |
+| Models       | Primitives, objects, arrays, enums, nullable values, dictionaries                 |
+| Composition  | `oneOf`, `anyOf`, `allOf`                                                         |
+| References   | Local component references, aliases, recursive models, escaped JSON Pointer names |
+| Requests     | Path/query parameters and JSON bodies, including `+json` media types              |
+| Query arrays | Repeated keys, comma-separated, space-delimited and pipe-delimited values         |
+| Runtime      | Custom fetch, headers, cancellation and per-request `RequestInit`                 |
 
-## Release process
+External references, multipart bodies, generated header/cookie parameters, security
+scheme generation, object query serialization, server-variable expansion, and
+OpenAPI 3.1-specific JSON Schema constructs are not implemented. Only the first
+successful response is modeled; non-JSON response schemas are not modeled.
 
-This repository uses Changesets.
+Read the [complete compatibility notes](./apps/docs/docs/guide/configuration.md)
+before using the generator with a new API. Small unsupported examples are welcome
+as [feature requests](https://github.com/minkinad/api-sdk-generator/issues/new/choose).
 
-1. Add a changeset with `pnpm changeset`.
-2. Merge the change into `main`.
-3. Merge the automated release PR opened by `changesets/action`.
-4. The workflow publishes to npm, updates changelogs, and creates GitHub Releases.
-
-## Publishing
-
-The repository root is a private workspace. Publish its two packages:
-
-- `@minkinad/api-sdk-generator-core`
-- `api-sdk-generator`
-
-For the first publication, use Node.js 24, log in to npm as `minkinad`, and run:
+## Development and verification
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm release:check
-npm login --registry=https://registry.npmjs.org/
-npm whoami --registry=https://registry.npmjs.org/
-pnpm release
+pnpm verify
 ```
 
-`release:check` builds and packs the packages, verifies archive contents, installs
-both archives in a temporary project, and runs ESM/CJS and CLI checks. It does not publish.
-`release` packs with pnpm and publishes with npm, replacing workspace dependencies
-and publishing core before CLI. Existing versions are skipped; failures stop the release.
-Use `pnpm release --dry-run` to inspect the publish operation without uploading.
+`verify` checks formatting, lint, types, tests, builds, demo drift, and npm archives.
+The archive check installs both packages into a temporary project and exercises
+ESM/CJS imports, CLI generation, preview, and drift detection. It requires registry
+access to install the packages' dependencies. It does not publish.
 
-After the first publication, configure a trusted publisher on npm for **each**
-package: owner `minkinad`, repository `api-sdk-generator`, workflow `release.yml`.
-The workflow uses OIDC without `NPM_TOKEN`; provenance is enabled only in GitHub Actions.
-Enable `Allow GitHub Actions to create and approve pull requests` in repository settings.
+| Workspace       | Responsibility                                     |
+| --------------- | -------------------------------------------------- |
+| `packages/core` | Load, parse, generate, format, and write SDK files |
+| `packages/cli`  | Command-line validation and execution              |
+| `apps/demo`     | Sample API and checked-in generated SDK            |
+| `apps/docs`     | VitePress documentation                            |
+| `scripts`       | Package smoke tests and release tooling            |
 
-**Подробная инструкция на русском, включая разбор ошибок:**
-[Публикация в npm](./apps/docs/docs/guide/publishing-npm.md).
+## Releases
 
-## Documentation
+Changesets manage package versions and changelogs. The root is a private workspace;
+the public packages are `api-sdk-generator` and `@minkinad/api-sdk-generator-core`.
 
-- GitHub Pages docs: https://minkinad.github.io/api-sdk-generator/
-- Enable Pages in `Settings -> Pages` and choose `GitHub Actions` as the source.
-- [Optional GitHub Packages publishing](./apps/docs/docs/guide/publishing-github-packages.md).
+- `pnpm version:packages`: apply pending changesets.
+- `pnpm release:check`: verify real package archives without publishing.
+- `pnpm release --dry-run`: inspect npm publication without uploading.
+- `pnpm release`: publish committed, versioned packages, core before CLI.
 
-## Contributing
+GitHub Actions uses npm trusted publishing and provenance. The first publication
+and each package's trusted publisher require maintainer setup.
+See the [release workflow](./apps/docs/docs/guide/release-flow.md) and
+[подробную инструкцию по npm](./apps/docs/docs/guide/publishing-npm.md).
 
-Contribution guide: [CONTRIBUTING.md](./CONTRIBUTING.md)
+## Community
 
-Full documentation: [apps/docs](./apps/docs)
+- [Contributing](./CONTRIBUTING.md): setup, tests, changesets, and review expectations.
+- [Support](./SUPPORT.md): questions and reproducible bug reports.
+- [Code of Conduct](./CODE_OF_CONDUCT.md): participation and moderation.
+- [Security policy](./SECURITY.md): private vulnerability reporting.
+- [Changelogs](./CHANGELOG.md): package release history.
+
+Maintained by [@minkinad](https://github.com/minkinad). Licensed under [MIT](./LICENSE).

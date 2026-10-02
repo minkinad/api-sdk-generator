@@ -1,16 +1,19 @@
 # Publishing to GitHub Packages
 
-GitHub Packages for npm requires scoped package names. This repository uses:
+GitHub Packages requires scoped npm names. This repository publishes
+`@minkinad/api-sdk-generator-core` there; the unscoped CLI is distributed through npm.
 
-- `api-sdk-generator` for npm
-- `@minkinad/api-sdk-generator-core` for npm and GitHub Packages
+The release workflow calls `package-github.yml` explicitly after npm/GitHub release
+completion. It passes the exact commit and grants `packages: write`. The reusable
+workflow also supports manual dispatch and interactive core release events.
 
-The `package-github.yml` workflow publishes the scoped core package directly to `npm.pkg.github.com`.
+Dependencies are installed from npm before publishing. `pnpm release:github-packages`
+packs the core and invokes npm with an explicit GitHub registry and temporary auth
+configuration. The built-in workflow token is supplied through `NODE_AUTH_TOKEN`.
+An already published version is skipped; authentication and network failures stop the job.
 
-## Authentication
+GitHub Packages visibility and installation permissions are separate from npm.
+Check the package's GitHub settings after its first publication.
 
-The workflow uses the built-in `GITHUB_TOKEN` with `packages: write`.
-
-## If you need the CLI on GitHub Packages
-
-Publish it under an owner scope such as `@minkinad/api-sdk-generator` in a dedicated registry-specific package manifest or a separate distribution package. Keeping the npm package unscoped is the cleaner default for `npx`.
+For the CLI on GitHub Packages, a separate scoped distribution such as
+`@minkinad/api-sdk-generator` would be needed; it is not part of this release flow.

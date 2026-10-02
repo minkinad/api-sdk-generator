@@ -16,6 +16,7 @@ api-sdk-generator generate [options]
 - `--dry-run`: validate and preview generated file names without writing
 - `--check`: compare generated files with disk without writing
 - `--clean`: delete the output directory before writing files
+- `--timeout <ms>`: positive schema download deadline in milliseconds, default `30000`
 - `--verbose`: print debug logs
 
 ## Validation rules

@@ -1,24 +1,43 @@
 name: Bug report
-description: Report a defect in the generator, CLI, or release workflow.
+description: Report a generator, SDK runtime, or publishing defect.
 title: '[Bug]: '
 labels: ['bug']
 body:
   - type: markdown
     attributes:
-      value: Thanks for reporting an issue. Please provide enough context to reproduce it.
+      value: Search existing issues first. Remove secrets, credentials, personal data, and internal URLs from examples. Report security vulnerabilities privately.
   - type: input
     id: version
     attributes:
-      label: Version
-      placeholder: 0.1.0
+      label: Generator version
+      description: Output of api-sdk-generator --version.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Node.js version, operating system, and package manager/version.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where does it fail?
+      options:
+        - Loading or parsing a schema
+        - Generating or compiling TypeScript
+        - Calling the generated SDK
+        - Installing or publishing a package
+        - Documentation or workflows
     validations:
       required: true
   - type: textarea
-    id: command
+    id: reproduction
     attributes:
-      label: Command
-      description: Exact CLI command or API call
-      placeholder: npx api-sdk-generator generate --file ./openapi.json --output ./generated
+      label: Minimal reproduction
+      description: Include the exact command and a small OpenAPI example or public reproduction repository.
+      render: text
     validations:
       required: true
   - type: textarea
@@ -30,6 +49,7 @@ body:
   - type: textarea
     id: actual
     attributes:
-      label: Actual behavior
+      label: Actual behavior and error output
+      render: text
     validations:
       required: true

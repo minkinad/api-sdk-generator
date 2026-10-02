@@ -11,7 +11,5 @@ const client = createClient({
   baseUrl: 'https://api.example.com',
 });
 
-await client.getUserById({
-  /* request */
-});
+await client.getUserById({/* request */});
 ```

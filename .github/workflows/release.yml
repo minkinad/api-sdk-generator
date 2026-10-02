@@ -2,56 +2,57 @@ name: Release
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 permissions:
-  contents: write
-  id-token: write
-  pull-requests: write
+  contents: read
 
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
+  checks:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/ci.yml
+
   release:
+    needs: checks
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+    outputs:
+      has-changesets: ${{ steps.changesets.outputs.hasChangesets }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          cache: pnpm
-          node-version: 24
-
+      - uses: ./.github/actions/setup
       - name: Setup npm with trusted publishing support
         run: npm install --global npm@11
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Validate release
-        run: pnpm lint && pnpm typecheck && pnpm test && pnpm release:check
-
-      - name: Create release PR or publish
-        uses: changesets/action@v1
+      - name: Create release PR or publish versioned packages
+        id: changesets
+        uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1
         with:
-          commit: 'chore: version packages'
-          createGithubReleases: true
-          publish: pnpm run release
-          version: pnpm run version
+          commit: 'chore(release): version packages'
+          title: 'chore(release): version packages'
+          createGithubReleases: false
+          publish: pnpm run release:ci
+          version: pnpm run version:packages
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+
+  github-packages:
+    needs: release
+    if: needs.release.outputs.has-changesets == 'false'
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/package-github.yml
+    with:
+      ref: ${{ github.sha }}

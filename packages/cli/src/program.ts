@@ -16,6 +16,7 @@ export function createCliProgram(): Command {
     .command('generate')
     .description('Generate SDK files from an OpenAPI schema URL or local file')
     .option('--url <url>', 'OpenAPI schema URL')
+    .option('--timeout <ms>', 'Schema download timeout in milliseconds', '30000')
     .option('--file <path>', 'Local path to an OpenAPI schema JSON or YAML file')
     .requiredOption('--output <path>', 'Output directory for the generated SDK')
     .option('--name <sdkName>', 'Override the generated SDK name')

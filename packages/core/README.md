@@ -1,7 +1,7 @@
 # @minkinad/api-sdk-generator-core
 
 Generate a TypeScript fetch SDK from an OpenAPI JSON or YAML document.
-Requires Node.js 20 or later. Supports ESM and CommonJS.
+Requires Node.js 20.19 or later. Supports ESM and CommonJS.
 
 ```bash
 npm install @minkinad/api-sdk-generator-core
@@ -18,7 +18,8 @@ console.log(result.operations);
 ```
 
 Use `input: { url: 'https://example.com/openapi.json' }` for remote schemas.
-Set `dryRun: true` to get formatted files in `result.files` without writing them.
+Remote schemas have a 30-second deadline; use `schemaTimeoutMs` to customize it
+and `signal` to cancel a download. Set `dryRun: true` to get formatted files in `result.files` without writing them.
 Set `check: true` to compare with disk; `result.changedFiles` contains missing or
 outdated files. Check mode does not modify files, even when `clean` is enabled.
 

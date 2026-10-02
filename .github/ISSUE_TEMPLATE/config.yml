@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation and support
+    url: https://github.com/minkinad/api-sdk-generator/blob/main/SUPPORT.md
+    about: Find usage help and guidance for reproducing problems.
+  - name: Report a security vulnerability
+    url: https://github.com/minkinad/api-sdk-generator/security/advisories/new
+    about: Report suspected vulnerabilities privately; do not open a public issue.

@@ -10,6 +10,9 @@ import { validateOpenApiDocument } from './validator.js';
 export interface LoadSchemaOptions {
   fetchImplementation?: typeof fetch;
   logger?: Logger;
+  signal?: AbortSignal;
+  /** Maximum time for fetching a schema, including reading its body. */
+  timeoutMs?: number;
 }
 
 function parseSchema(content: string): OpenApiDocument {
@@ -19,7 +22,26 @@ function parseSchema(content: string): OpenApiDocument {
   if (parsed.errors.length > 0) {
     throw new SchemaLoadError(`Invalid JSON or YAML: ${parsed.errors[0].message}`);
   }
-  return validateOpenApiDocument(parsed.toJS({ maxAliasCount: 100 }) as unknown);
+  const document = parsed.toJS({ maxAliasCount: 100 }) as unknown;
+  rejectAliasCycles(document);
+  return validateOpenApiDocument(document);
+}
+
+function rejectAliasCycles(
+  value: unknown,
+  active = new WeakSet<object>(),
+  seen = new WeakSet<object>(),
+): void {
+  if (typeof value !== 'object' || value === null) return;
+  if (active.has(value))
+    throw new SchemaLoadError(
+      'Cyclic YAML aliases are unsupported. Use OpenAPI $ref for recursive models.',
+    );
+  if (seen.has(value)) return;
+  active.add(value);
+  for (const child of Object.values(value)) rejectAliasCycles(child, active, seen);
+  active.delete(value);
+  seen.add(value);
 }
 
 export async function loadOpenApiDocument(
@@ -36,7 +58,12 @@ export async function loadOpenApiDocument(
     return loadOpenApiDocumentFromFile(input.file, options.logger);
   }
 
-  return loadOpenApiDocumentFromUrl(input.url!, options.fetchImplementation, options.logger);
+  return loadOpenApiDocumentFromUrl(
+    input.url!,
+    options.fetchImplementation,
+    options.logger,
+    options,
+  );
 }
 
 export async function loadOpenApiDocumentFromFile(
@@ -63,16 +90,29 @@ export async function loadOpenApiDocumentFromUrl(
   url: string,
   fetchImplementation?: typeof fetch,
   logger?: Logger,
+  options: Pick<LoadSchemaOptions, 'signal' | 'timeoutMs'> = {},
 ): Promise<OpenApiDocument> {
   const runtimeFetch = fetchImplementation ?? globalThis.fetch;
+  const timeoutMs = options.timeoutMs ?? 30_000;
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 2_147_483_647) {
+    throw new SchemaLoadError(
+      'Schema timeout must be a positive integer no greater than 2147483647 milliseconds.',
+    );
+  }
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  const signal = options.signal ? AbortSignal.any([options.signal, timeoutSignal]) : timeoutSignal;
 
   if (!runtimeFetch) {
     throw new SchemaLoadError('Fetch API is not available in the current runtime.');
   }
 
   try {
+    if (!['http:', 'https:'].includes(new URL(url).protocol)) {
+      throw new SchemaLoadError('Schema URLs must use HTTP or HTTPS.');
+    }
+    signal.throwIfAborted();
     logger?.debug(`Loading OpenAPI schema from URL: ${url}`);
-    const response = await runtimeFetch(url);
+    const response = await runtimeFetch(url, { signal });
 
     if (!response.ok) {
       throw new SchemaLoadError(
@@ -84,6 +124,13 @@ export async function loadOpenApiDocumentFromUrl(
   } catch (error) {
     if (error instanceof ApiSdkGeneratorError) {
       throw error;
+    }
+
+    if (timeoutSignal.aborted && !options.signal?.aborted) {
+      throw new SchemaLoadError(
+        `Timed out loading OpenAPI schema after ${timeoutMs} milliseconds.`,
+        error,
+      );
     }
 
     throw new SchemaLoadError(`Failed to load OpenAPI schema from URL "${url}".`, error);
