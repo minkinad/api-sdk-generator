@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 import { OutputWriteError } from './errors.js';
 import { formatGeneratedFiles } from './formatter.js';
 import { generateClientSource } from './generator/client-generator.js';
@@ -61,6 +63,17 @@ export async function generateSdk(options: GenerateSdkOptions): Promise<Generate
       path: 'README.md',
     },
   ]);
+
+  if (options.input.file && !options.check && !options.dryRun) {
+    const inputPath = await canonicalPath(options.input.file);
+    for (const file of files) {
+      if (inputPath === (await canonicalPath(path.join(options.outputDir, file.path)))) {
+        throw new OutputWriteError(
+          `Refusing to overwrite the input schema with generated file "${file.path}".`,
+        );
+      }
+    }
+  }
 
   const changedFiles = options.check ? await compareGeneratedFiles(options.outputDir, files) : [];
   if (!options.check && !options.dryRun) {

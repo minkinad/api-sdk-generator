@@ -119,4 +119,31 @@ describe('writeGeneratedFiles', () => {
     expect(await readFile(path.join(root, 'index.ts'), 'utf8')).toBe('new');
     expect(await readdir(root)).toEqual(['index.ts']);
   });
+
+  it('keeps the old SDK when a clean generation cannot stage all files', async () => {
+    const root = await createTempDirectory();
+    const output = path.join(root, 'generated');
+    await writeGeneratedFiles(output, [{ path: 'index.ts', content: 'old' }]);
+    await expect(
+      writeGeneratedFiles(
+        output,
+        [
+          { path: 'nested', content: 'file' },
+          { path: 'nested/child.ts', content: 'conflict' },
+        ],
+        true,
+      ),
+    ).rejects.toThrow();
+    expect(await readFile(path.join(output, 'index.ts'), 'utf8')).toBe('old');
+  });
+
+  it('refuses to overwrite the working directory without clean', async () => {
+    const root = await createTempDirectory();
+    await writeFile(path.join(root, 'index.ts'), 'existing');
+    vi.spyOn(process, 'cwd').mockReturnValue(root);
+    await expect(
+      writeGeneratedFiles(root, [{ path: 'index.ts', content: 'generated' }]),
+    ).rejects.toThrow('working directory');
+    expect(await readFile(path.join(root, 'index.ts'), 'utf8')).toBe('existing');
+  });
 });

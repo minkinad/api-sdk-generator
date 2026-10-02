@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { lstat, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -70,6 +70,40 @@ async function writeFileAtomically(file: ResolvedGeneratedFile): Promise<void> {
   }
 }
 
+async function writeCleanOutput(outputDir: string, files: ResolvedGeneratedFile[]): Promise<void> {
+  const outputRoot = path.resolve(outputDir);
+  await mkdir(path.dirname(outputRoot), { recursive: true });
+  const staged = await mkdtemp(
+    path.join(path.dirname(outputRoot), `.${path.basename(outputRoot)}-stage-`),
+  );
+  const backup = `${outputRoot}.${randomUUID()}.backup`;
+  let movedOldOutput = false;
+  try {
+    for (const file of files) {
+      await writeFileAtomically({
+        ...file,
+        fullPath: path.join(staged, path.relative(outputRoot, file.fullPath)),
+      });
+    }
+    try {
+      await lstat(outputRoot);
+      await rename(outputRoot, backup);
+      movedOldOutput = true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+    try {
+      await rename(staged, outputRoot);
+    } catch (error) {
+      if (movedOldOutput) await rename(backup, outputRoot);
+      throw error;
+    }
+    if (movedOldOutput) await rm(backup, { force: true, recursive: true });
+  } finally {
+    await rm(staged, { force: true, recursive: true });
+  }
+}
+
 export async function writeGeneratedFiles(
   outputDir: string,
   files: GeneratedFile[],
@@ -78,18 +112,19 @@ export async function writeGeneratedFiles(
   try {
     const resolvedFiles = resolveGeneratedFiles(outputDir, files);
     await validateOutputPaths(outputDir, resolvedFiles);
+    const outputRoot = await canonicalPath(outputDir);
+    if (
+      outputRoot === (await canonicalPath(os.homedir())) ||
+      isWithinDirectory(outputRoot, await canonicalPath(process.cwd()))
+    ) {
+      throw new OutputWriteError(
+        'Refusing to write to the home directory, working directory, or its ancestors.',
+      );
+    }
 
     if (clean) {
-      const outputRoot = await canonicalPath(outputDir);
-      if (
-        outputRoot === (await canonicalPath(os.homedir())) ||
-        isWithinDirectory(outputRoot, await canonicalPath(process.cwd()))
-      ) {
-        throw new OutputWriteError(
-          'Refusing to clean the home directory, working directory, or its ancestors.',
-        );
-      }
-      await rm(outputDir, { force: true, recursive: true });
+      await writeCleanOutput(outputDir, resolvedFiles);
+      return;
     }
 
     await mkdir(outputDir, { recursive: true });
