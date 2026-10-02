@@ -1,9 +1,4 @@
-# API SDK Generator
-
-[![CI](https://img.shields.io/github/actions/workflow/status/minkinad/api-sdk-generator/ci.yml?branch=main)](https://github.com/minkinad/api-sdk-generator/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/api-sdk-generator)](https://www.npmjs.com/package/api-sdk-generator)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-[![Documentation](https://img.shields.io/badge/docs-online-blue)](https://minkinad.github.io/api-sdk-generator/)
+# API SDK Generator [![CI](https://img.shields.io/github/actions/workflow/status/minkinad/api-sdk-generator/ci.yml?branch=main)](https://github.com/minkinad/api-sdk-generator/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/api-sdk-generator)](https://www.npmjs.com/package/api-sdk-generator) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE) [![Documentation](https://img.shields.io/badge/docs-online-blue)](https://minkinad.github.io/api-sdk-generator/)
 
 **Generate a typed TypeScript fetch client from an OpenAPI JSON or YAML document.**
 Run it from the command line or call the reusable core from a build script. The
@@ -138,14 +133,16 @@ The generator implements a documented **subset of OpenAPI**, based on the 3.0 sc
 | Models       | Primitives, objects, arrays, enums, nullable values, dictionaries                 |
 | Composition  | `oneOf`, `anyOf`, `allOf`                                                         |
 | References   | Local component references, aliases, recursive models, escaped JSON Pointer names |
-| Requests     | Path/query parameters and JSON bodies, including `+json` media types              |
+| Requests     | Primitive path/query parameters and JSON bodies, including `+json` media types    |
 | Query arrays | Repeated keys, comma-separated, space-delimited and pipe-delimited values         |
+| Responses    | All successful statuses; JSON, text and binary response bodies                    |
 | Runtime      | Custom fetch, headers, cancellation and per-request `RequestInit`                 |
 
 External references, multipart bodies, generated header/cookie parameters, security
-scheme generation, object query serialization, server-variable expansion, and
-OpenAPI 3.1-specific JSON Schema constructs are not implemented. Only the first
-successful response is modeled; non-JSON response schemas are not modeled.
+scheme generation, object query serialization, server-variable expansion, and most
+OpenAPI 3.1-specific JSON Schema constructs are not implemented. OpenAPI 3.1 nullable
+type arrays are supported. Unsupported parameter serialization and response media
+types cause a generation error.
 
 Read the [complete compatibility notes](./apps/docs/docs/guide/configuration.md)
 before using the generator with a new API. Small unsupported examples are welcome

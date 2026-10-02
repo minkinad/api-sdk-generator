@@ -32,6 +32,7 @@ export default defineConfig({
           { text: 'CLI Usage', link: '/guide/cli-usage' },
           { text: 'Generated SDK Example', link: '/guide/generated-sdk-example' },
           { text: 'Configuration', link: '/guide/configuration' },
+          { text: 'Architecture', link: '/guide/architecture' },
           { text: 'GitHub Actions Release Flow', link: '/guide/release-flow' },
           { text: 'Publishing to npm', link: '/guide/publishing-npm' },
           { text: 'Publishing to GitHub Packages', link: '/guide/publishing-github-packages' },
