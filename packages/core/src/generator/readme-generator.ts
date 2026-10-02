@@ -2,7 +2,7 @@ import type { ParsedDocument } from '../types.js';
 
 export function generateGeneratedReadme(parsed: ParsedDocument): string {
   const exampleOperation = parsed.operations[0];
-  const exampleCall = exampleOperation?.hasRequestShape
+  const exampleCall = exampleOperation?.hasRequiredRequestFields
     ? `${exampleOperation.functionName}({ /* request */ })`
     : `${exampleOperation?.functionName ?? 'listResources'}()`;
 
