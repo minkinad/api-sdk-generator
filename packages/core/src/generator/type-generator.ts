@@ -8,6 +8,7 @@ import { isSchemaObject } from '../validator.js';
 
 interface TypeRenderContext {
   document: OpenApiDocument;
+  componentTypeNames: Record<string, string>;
 }
 
 function quoteEnumValue(value: string | number | boolean | null): string {
@@ -53,12 +54,47 @@ function renderObjectType(schema: OpenAPIV3.SchemaObject, context: TypeRenderCon
 export function renderSchema(schema: SchemaLike, context: TypeRenderContext): string {
   if (isReferenceObject(schema)) {
     resolveSchema(context.document, schema);
-    return toTypeName(getReferenceName(schema.$ref));
+    return (
+      context.componentTypeNames[getReferenceName(schema.$ref)] ??
+      toTypeName(getReferenceName(schema.$ref))
+    );
+  }
+
+  if ('not' in schema && schema.not) {
+    throw new UnsupportedSchemaError('OpenAPI not schemas are unsupported.');
+  }
+  if ('const' in schema) {
+    throw new UnsupportedSchemaError('OpenAPI 3.1 const schemas are unsupported.');
   }
 
   if (schema.enum && schema.enum.length > 0) {
     return normalizeNullable(schema.enum.map(quoteEnumValue).join(' | '), schema);
   }
+
+  // OpenAPI 3.1 uses JSON Schema type arrays, which are absent from the
+  // OpenAPI 3.0 declarations provided by openapi-types.
+  const rawType: unknown = schema.type;
+  if (Array.isArray(rawType)) {
+    if (
+      rawType.length === 0 ||
+      rawType.some(
+        (type) =>
+          !['string', 'number', 'integer', 'boolean', 'array', 'object', 'null'].includes(
+            type as string,
+          ),
+      )
+    ) {
+      throw new UnsupportedSchemaError('Unsupported OpenAPI 3.1 schema type array.');
+    }
+    return [...new Set(rawType as string[])]
+      .map((type) =>
+        type === 'null'
+          ? 'null'
+          : renderSchema({ ...schema, type, nullable: false } as OpenAPIV3.SchemaObject, context),
+      )
+      .join(' | ');
+  }
+  if (rawType === 'null') return 'null';
 
   if (schema.oneOf && schema.oneOf.length > 0) {
     return normalizeNullable(
@@ -113,8 +149,9 @@ function renderNamedSchemaExport(
   schema: SchemaLike,
   context: TypeRenderContext,
 ): string {
+  const typeName = context.componentTypeNames[name] ?? toTypeName(name);
   if (isReferenceObject(schema)) {
-    return `export type ${toTypeName(name)} = ${renderSchema(schema, context)};`;
+    return `export type ${typeName} = ${renderSchema(schema, context)};`;
   }
 
   const resolved = resolveSchema(context.document, schema);
@@ -129,10 +166,10 @@ function renderNamedSchemaExport(
     !resolved.anyOf &&
     !resolved.additionalProperties
   ) {
-    return `export interface ${toTypeName(name)} ${rendered}`;
+    return `export interface ${typeName} ${rendered}`;
   }
 
-  return `export type ${toTypeName(name)} = ${rendered};`;
+  return `export type ${typeName} = ${rendered};`;
 }
 
 function createRequestSchema(operation: ParsedOperation): OpenAPIV3.SchemaObject | undefined {
@@ -168,6 +205,18 @@ function createResponseSchema(operation: ParsedOperation): SchemaLike | undefine
   return operation.response.schema;
 }
 
+function renderResponseType(
+  response: ParsedOperation['response'],
+  context: TypeRenderContext,
+): string {
+  if (response.binary) return 'ArrayBuffer';
+  return response.schema
+    ? renderSchema(response.schema, context)
+    : response.contentType
+      ? 'unknown'
+      : 'void';
+}
+
 function renderOperationTypes(parsed: ParsedDocument, context: TypeRenderContext): string[] {
   const blocks: string[] = [];
 
@@ -182,8 +231,21 @@ function renderOperationTypes(parsed: ParsedDocument, context: TypeRenderContext
 
     const responseSchema = createResponseSchema(operation);
 
-    if (responseSchema) {
+    if ((operation.responses?.length ?? 1) > 1) {
+      const variants = [
+        ...new Set(
+          (operation.responses ?? [operation.response]).map((response) =>
+            renderResponseType(response, context),
+          ),
+        ),
+      ];
+      blocks.push(`export type ${operation.responseTypeName} = ${variants.join(' | ')};`);
+    } else if (operation.response.binary) {
+      blocks.push(`export type ${operation.responseTypeName} = ArrayBuffer;`);
+    } else if (responseSchema) {
       blocks.push(renderNamedSchemaExport(operation.responseTypeName, responseSchema, context));
+    } else if (operation.response.contentType) {
+      blocks.push(`export type ${operation.responseTypeName} = unknown;`);
     } else {
       blocks.push(`export type ${operation.responseTypeName} = void;`);
     }
@@ -195,6 +257,7 @@ function renderOperationTypes(parsed: ParsedDocument, context: TypeRenderContext
 export function generateTypesSource(parsed: ParsedDocument): string {
   const context: TypeRenderContext = {
     document: parsed.document,
+    componentTypeNames: parsed.componentTypeNames ?? {},
   };
   const componentBlocks = Object.entries(parsed.componentSchemas)
     .sort(([left], [right]) => left.localeCompare(right))
