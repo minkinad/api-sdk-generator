@@ -1,4 +1,4 @@
-import { access, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import ts from 'typescript';
@@ -150,6 +150,139 @@ void [dictionary, nullable, composite, choice, invalid];
       'containing the input schema',
     );
     expect(await readFile(file, 'utf8')).toBe(JSON.stringify(fixture));
+  });
+
+  it('does not overwrite the input schema when it matches a generated filename', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'api-sdk-input-output-'));
+    tempDirectories.push(root);
+    const outputDir = path.join(root, 'generated');
+    await mkdir(outputDir);
+    const schemaPath = path.join(outputDir, 'README.md');
+    const content = JSON.stringify({ openapi: '3.0.3', info: { title: 'Overlap' }, paths: {} });
+    await writeFile(schemaPath, content);
+    await expect(generateSdk({ input: { file: schemaPath }, outputDir })).rejects.toThrow(
+      'overwrite the input schema',
+    );
+    expect(await readFile(schemaPath, 'utf8')).toBe(content);
+  });
+
+  it('compiles colliding component names and produces stable output for reordered input', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'api-sdk-stable-'));
+    tempDirectories.push(root);
+    const document = {
+      openapi: '3.0.3',
+      info: { title: 'Stable' },
+      components: { schemas: { User: { type: 'string' }, user: { type: 'number' } } },
+      paths: {
+        '/b': {
+          get: {
+            operationId: 'get_user',
+            responses: {
+              '200': {
+                description: 'OK',
+                content: { 'application/json': { schema: { $ref: '#/components/schemas/user' } } },
+              },
+            },
+          },
+        },
+        '/a': {
+          get: {
+            operationId: 'get-user',
+            responses: {
+              '200': {
+                description: 'OK',
+                content: { 'application/json': { schema: { $ref: '#/components/schemas/User' } } },
+              },
+            },
+          },
+        },
+      },
+    };
+    const firstFile = path.join(root, 'first.json');
+    const secondFile = path.join(root, 'second.json');
+    await writeFile(firstFile, JSON.stringify(document));
+    await writeFile(
+      secondFile,
+      JSON.stringify({
+        ...document,
+        components: {
+          schemas: {
+            user: document.components.schemas.user,
+            User: document.components.schemas.User,
+          },
+        },
+        paths: { '/a': document.paths['/a'], '/b': document.paths['/b'] },
+      }),
+    );
+    const outputDir = path.join(root, 'generated');
+    const first = await generateSdk({ input: { file: firstFile }, outputDir, dryRun: true });
+    const second = await generateSdk({ input: { file: secondFile }, outputDir, dryRun: true });
+    expect(first.files).toEqual(second.files);
+    await generateSdk({ input: { file: firstFile }, outputDir });
+    expect(await compileGeneratedFiles(outputDir)).toEqual([]);
+  }, 60000);
+
+  it('keeps schema-controlled names inside the output directory', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'api-sdk-untrusted-'));
+    tempDirectories.push(root);
+    const schemaPath = path.join(root, 'schema.json');
+    const outputDir = path.join(root, 'generated');
+    await writeFile(
+      schemaPath,
+      JSON.stringify({
+        openapi: '3.0.3',
+        info: { title: 'Untrusted' },
+        paths: {
+          '/items/{id}': {
+            get: {
+              parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }],
+              responses: {
+                '200': {
+                  description: 'OK',
+                  content: {
+                    'application/json': { schema: { $ref: '#/components/schemas/class' } },
+                  },
+                },
+              },
+            },
+          },
+        },
+        components: {
+          schemas: {
+            '../../package.json': { type: 'string' },
+            class: {
+              type: 'object',
+              properties: {
+                default: { type: 'string' },
+                delete: { type: 'boolean' },
+                class: { type: 'number' },
+              },
+            },
+          },
+        },
+      }),
+    );
+    await generateSdk({ input: { file: schemaPath }, outputDir });
+    await expect(access(path.join(root, 'package.json'))).rejects.toThrow();
+    expect(await compileGeneratedFiles(outputDir)).toEqual([]);
+  }, 60000);
+
+  it('rejects a broken schema reference with its pointer', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'api-sdk-broken-ref-'));
+    tempDirectories.push(root);
+    const schemaPath = path.join(root, 'schema.json');
+    await writeFile(
+      schemaPath,
+      JSON.stringify({
+        openapi: '3.0.3',
+        info: { title: 'Broken' },
+        paths: {},
+        components: { schemas: { Alias: { $ref: '#/components/schemas/Missing' } } },
+      }),
+    );
+    await expect(
+      generateSdk({ input: { file: schemaPath }, outputDir: path.join(root, 'generated') }),
+    ).rejects.toThrow('#/components/schemas/Missing');
   });
 
   it.each([{}, { '/health': { head: { responses: { '204': { description: 'Healthy' } } } } }])(
