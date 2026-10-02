@@ -87,6 +87,8 @@ Scope `@minkinad` принадлежит npm-пользователю `minkinad`
    ```bash
    pnpm version:packages
    pnpm verify
+   pnpm release:check
+   pnpm release --dry-run
    git add .
    git commit -m "chore(release): version packages"
    ```
@@ -116,11 +118,13 @@ Scope `@minkinad` принадлежит npm-пользователю `minkinad`
    и создаст недостающие GitHub Releases:
 
    ```bash
+   core_version=$(node -p "require('./packages/core/package.json').version")
+   cli_version=$(node -p "require('./packages/cli/package.json').version")
    git push origin main
-   git push origin 'refs/tags/@minkinad/api-sdk-generator-core@0.3.0' 'refs/tags/api-sdk-generator@0.3.0'
+   git push origin "refs/tags/@minkinad/api-sdk-generator-core@${core_version}" "refs/tags/api-sdk-generator@${cli_version}"
    ```
 
-   В командах тегов подставь фактически выпущенные версии. Не перемещай существующие теги.
+   Версии тегов берутся из опубликованных пакетов. Не перемещай существующие теги.
 
 ## Последующие релизы через GitHub Actions без NPM_TOKEN
 
