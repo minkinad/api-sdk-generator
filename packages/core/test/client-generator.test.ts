@@ -34,7 +34,8 @@ describe('client generator', () => {
     expect(source).toContain(
       'appendQueryParameter(searchParams, "page", request["page"], true, ",");',
     );
-    expect(source).toContain('headers.set("content-type", "application/json");');
+    expect(source).toContain('async function sendRequest<T>');
+    expect(source).toContain('headers.set("content-type", contentType);');
   });
 
   it('preserves base URL paths when resolving operation paths', async () => {

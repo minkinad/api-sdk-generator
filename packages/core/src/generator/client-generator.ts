@@ -11,7 +11,7 @@ function renderTemplatePath(path: string, operation: ParsedOperation): string {
     parts.push(`encodeURIComponent(String(request[${JSON.stringify(parameter.name)}]))`);
     offset = match.index + match[0].length;
   }
-  parts.push(JSON.stringify(path.slice(offset)));
+  if (offset < path.length) parts.push(JSON.stringify(path.slice(offset)));
   return parts.join(' + ');
 }
 
@@ -37,6 +37,11 @@ function renderMethodSignature(operation: ParsedOperation): string {
 }
 
 function renderMethodImplementation(operation: ParsedOperation): string {
+  const responseContentTypes = Object.fromEntries(
+    (operation.responses ?? [operation.response])
+      .filter((response) => response.contentType)
+      .map((response) => [response.statusCode, response.contentType]),
+  );
   const requestParameter = operation.hasRequestShape
     ? operation.hasRequiredRequestFields
       ? 'request'
@@ -46,33 +51,17 @@ function renderMethodImplementation(operation: ParsedOperation): string {
   const bodyContent =
     operation.requestBody?.contentType === 'application/json' ||
     operation.requestBody?.contentType?.endsWith('+json')
-      ? [
-          '      const body = request.body !== undefined ? JSON.stringify(request.body) : undefined;',
-          '      if (body !== undefined && !headers.has("content-type")) {',
-          `        headers.set("content-type", ${JSON.stringify(operation.requestBody.contentType)});`,
-          '      }',
-        ].join('\n')
-      : '      const body = undefined;';
+      ? '      const body = request.body !== undefined ? JSON.stringify(request.body) : undefined;'
+      : '';
 
   return [
     `    async ${operation.functionName}(${requestParameter}${requestParameter ? ', ' : ''}init?: RequestInit): Promise<${operation.responseTypeName}> {`,
     `      const url = resolveRequestUrl(resolveBaseUrl(config.baseUrl), ${renderTemplatePath(operation.path, operation)});`,
-    '      const searchParams = url.searchParams;',
-    ...(queryLines.length > 0 ? queryLines : ['      void searchParams;']),
-    '      const headers = new Headers(config.headers);',
-    bodyContent,
-    '      const response = await runtimeFetch(url, {',
-    '        ...init,',
-    `        method: ${JSON.stringify(operation.method.toUpperCase())},`,
-    '        body,',
-    '        headers: mergeHeaders(headers, init?.headers),',
-    '      });',
-    '',
-    '      if (!response.ok) {',
-    '        throw await ApiError.fromResponse(response);',
-    '      }',
-    '',
-    `      return parseResponse<${operation.responseTypeName}>(response);`,
+    ...(queryLines.length > 0
+      ? ['      const searchParams = url.searchParams;', ...queryLines]
+      : []),
+    ...(bodyContent ? [bodyContent] : []),
+    `      return sendRequest<${operation.responseTypeName}>(url, ${JSON.stringify(operation.method.toUpperCase())}, ${bodyContent ? 'body' : 'undefined'}, ${JSON.stringify(operation.requestBody?.contentType)}, ${JSON.stringify(responseContentTypes)}, ${JSON.stringify(responseContentTypes.default ?? operation.response.contentType ?? '')}, init);`,
     '    },',
   ].join('\n');
 }
@@ -138,6 +127,25 @@ export function generateClientSource(parsed: ParsedDocument): string {
     '    throw new Error("Fetch API is not available in the current runtime.");',
     '  }',
     '',
+    ...(parsed.operations.length > 0
+      ? [
+          '  async function sendRequest<T>(url: URL, method: string, body: BodyInit | undefined, contentType: string | undefined, responseContentTypes: Record<string, string>, fallbackContentType: string, init?: RequestInit): Promise<T> {',
+          '    const headers = new Headers(config.headers);',
+          '    if (body !== undefined && contentType && !headers.has("content-type")) {',
+          '      headers.set("content-type", contentType);',
+          '    }',
+          '    const response = await runtimeFetch(url, {',
+          '      ...init,',
+          '      method,',
+          '      body,',
+          '      headers: mergeHeaders(headers, init?.headers),',
+          '    });',
+          '    if (!response.ok) throw await ApiError.fromResponse(response);',
+          '    return parseResponse<T>(response, responseContentTypes[String(response.status)] ?? fallbackContentType);',
+          '  }',
+          '',
+        ]
+      : []),
     '  return {',
     ...methodLines,
     '  };',
@@ -154,24 +162,27 @@ export function generateClientSource(parsed: ParsedDocument): string {
           '  return new URL(requestPath.replace(/^\\/+/, ""), normalizedBaseUrl);',
           '}',
           '',
-          'async function parseResponse<T>(response: Response): Promise<T> {',
-          '  return (await parseResponseBody(response)) as T;',
+          'async function parseResponse<T>(response: Response, expectedContentType: string): Promise<T> {',
+          '  return (await parseResponseBody(response, expectedContentType)) as T;',
           '}',
           '',
         ]
       : []),
-    'async function parseResponseBody(response: Response): Promise<unknown> {',
+    'async function parseResponseBody(response: Response, expectedContentType = ""): Promise<unknown> {',
     '  if (response.status === 204 || response.status === 205) {',
     '    return undefined;',
     '  }',
     '',
+    '  const contentType = response.headers.get("content-type") ?? expectedContentType;',
+    '  if (contentType.split(";", 1)[0].trim().toLowerCase() === "application/octet-stream") {',
+    '    return response.arrayBuffer();',
+    '  }',
     '  const body = await response.text();',
     '',
     '  if (!body) {',
     '    return undefined;',
     '  }',
     '',
-    '  const contentType = response.headers.get("content-type") ?? "";',
     '  return isJsonContentType(contentType) ? (JSON.parse(body) as unknown) : body;',
     '}',
     '',
@@ -183,12 +194,12 @@ export function generateClientSource(parsed: ParsedDocument): string {
     ...(parsed.operations.some((operation) => operation.queryParameters.length > 0)
       ? [
           'function appendQueryParameter(params: URLSearchParams, name: string, value: unknown, explode: boolean, separator: string): void {',
-          '  if (value === undefined) return;',
+          '  if (value === undefined || value === null) return;',
           '  if (Array.isArray(value)) {',
           '    if (explode) {',
-          '      for (const item of value) params.append(name, String(item));',
+          '      for (const item of value) if (item !== undefined && item !== null) params.append(name, String(item));',
           '    } else {',
-          '      params.set(name, value.map(String).join(separator));',
+          '      params.set(name, value.filter((item) => item !== undefined && item !== null).map(String).join(separator));',
           '    }',
           '  } else {',
           '    params.set(name, String(value));',
